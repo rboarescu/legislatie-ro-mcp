@@ -47,14 +47,30 @@ Chiar dacă documentul utilizatorului nu menționează nicio lege (sau mențione
 
 ### Pasul 3: Căutarea Autonomă a Porțiunilor Relevante (RAG Live)
 Execută căutări succesive până ai textul exact al articolelor incidente:
-- **Dacă ai conectat serverul MCP / OpenAPI (`legislatie-ro-mcp`):**
+- **Dacă ai conectat serverul MCP local (`legislatie-ro-mcp`: Claude Desktop `.mcpb`, Claude Code, Cursor):**
   1. Apelează `extrage_articole_din_act` pentru toate articolele invocate în documentul utilizatorului (pentru a verifica dacă sunt în vigoare și ce spun exact).
-  2. Apelează `cauta_in_interiorul_actului` sau `cauta_acte_normative` cu termenii juridici deduși la Pasul 2 pentru a găsi articolele pe care documentul le-a omis sau le-a încălcat.
+  2. Apelează `cauta_in_interiorul_actului` cu termenii juridici deduși la Pasul 2 pentru a găsi articolele pe care documentul le-a omis sau le-a încălcat (rezultatele sunt ordonate după relevanță). `cauta_acte_normative` găsește actele când nu știi numărul.
   3. Dacă e vorba de o lege amplă și nu știi numărul articolului (ex: dispoziții tranzitorii, cvorum, sancțiuni), apelează întâi `exploreaza_cuprinsul_actului`.
+- **Dacă ai conectat varianta remote (Cloudflare Worker, `/mcp` sau OpenAPI `/cauta`):** există o singură unealtă, `cauta_si_extrage_legislatie_ro`, cu parametrii `act` + `articole` (extragere) sau `act` + `cuvinte_cheie` (căutare în act).
+- **În ambele variante:** scrie actul cu tip, număr și **an** (`HG 859/2021`, nu `HG 859`); pentru Coduri poți folosi denumirea (`Codul civil`, `Codul muncii`, `Codul administrativ`, `Codul de procedură civilă`, `Codul urbanismului`). Articolele de peste 999 se pot cere ca `1270` sau `1.270`. Alineatele și literele nu filtrează: primești articolul întreg și citezi tu alineatul relevant.
 - **Dacă rulezi doar cu Web Search nativ (fără MCP):**
   1. Caută țintit: `site:legislatie.just.ro "<Tip și Număr Act>" "<Articolul X sau cuvinte cheie din textul legii>"` (ex: `site:legislatie.just.ro "LEGE nr. 554" "Articolul 11"` sau `site:legislatie.just.ro "OUG 57/2019" "Articolul 292"`).
   2. Caută existența unor dezlegări obligatorii: `site:legislatie.just.ro " Înalta Curte" "recurs în interesul legii" OR "dezlegarea unor chestiuni de drept" <tema>` și `site:legislatie.just.ro "Curtea Constituțională" <legea și articolul>`.
   3. Dacă primul rezultat arată doar titlul actului sau un act modificator, fă o a doua căutare pe textul exact al articolului pentru a citi toate alineatele.
+
+#### Cum interpretezi răspunsul uneltei
+| Primești în răspuns | Ce faci |
+| :--- | :--- |
+| `ambiguu: true` (+ eventual `candidati`) | Numărul actului există în mai mulți ani. Alege din `candidati` doar dacă titlul se potrivește clar cu întrebarea; altfel **întreabă utilizatorul anul**. Nu descrie conținutul vreunui act până nu l-ai extras. |
+| `mesaj`: niciun articol nu conține termenii | Legea folosește alte cuvinte. Reformulează în limbajul legii (vezi secțiunea 6 din `references/DOMENII_SI_LEGI.md`, ex: „drone” → „aeronave fără pilot”) sau alege articolele din `cuprins_articole`. |
+| `cuprins_articole` | Harta actului (articol + primul rând). Folosește-o pentru apeluri țintite cu `articole`, mai ales când întrebarea e despre un detaliu (termen, durată, document). |
+| `articole_negasite` | Articolul nu există în forma la zi (abrogat, renumerotat sau număr greșit). Spune asta; nu reconstrui textul din memorie. |
+| `avertisment` | Forma consolidată nu a putut fi preluată sau textul vine din altă sursă. Spune-i utilizatorului că textul poate să nu fie la zi și dă-i linkul oficial. |
+| `note_modificari_ril_ccr` / `notes` | Istoricul modificărilor și deciziile CCR / RIL / HP legate de articol. Menționează-le când schimbă interpretarea. |
+
+**Verifică fiecare afirmație concretă înainte de a o scrie.** Orice termen („7 zile”, „12 luni”), instituție sau document pe care îl prezinți ca fiind „conform legii” trebuie să apară în textul returnat de unealtă. Dacă nu apare, spune explicit că textul extras nu prevede acest lucru și caută mai departe (alt articol, actul de aplicare, ordinul ministrului), în loc să completezi din memorie.
+
+**Când utilizatorul pune la îndoială o afirmație** („unde scrie asta?”), reextrage articolul și citează textul exact. Dacă textul confirmă afirmația, menține-o și arată citatul; dacă nu, corecteaz-o. Nu retrage o afirmație corectă și nu inventa o altă sursă pentru a o justifica.
 
 ### Pasul 4: Formularea Răspunsului Ancorat
 Adaptează tonul la utilizator, dar păstrează întotdeauna rigoarea juridică:
