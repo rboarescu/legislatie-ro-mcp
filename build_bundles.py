@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Script de impachetare One-Click:
-1. Genereaza `dist/legislatie-ro.mcpb` — Pachetul One-Click Install pentru Claude Desktop
-2. Genereaza `dist/legislatie-ro-browser-extension.zip` — Pachetul pentru Chrome / Edge / Brave / Firefox
+Impacheteaza `skills/legislatie-ro-skill.zip` (gata de incarcat cu 1 click in Claude.ai -> Settings -> Capabilities -> Skills)
+precum si `dist/legislatie-ro.mcpb` si `dist/legislatie-ro-browser-extension.zip`.
 """
 
 import zipfile
@@ -11,6 +10,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 DIST.mkdir(exist_ok=True)
+
+
+def build_skill_zip() -> Path:
+    out_path = DIST / "legislatie-ro-skill.zip"
+    skills_dir = ROOT / "skills"
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(skills_dir.rglob("*")):
+            if file_path.is_file():
+                zf.write(
+                    file_path,
+                    arcname=str(Path("legislatie-ro") / file_path.relative_to(skills_dir)),
+                )
+    return out_path
 
 
 def build_mcpb() -> Path:
@@ -32,7 +44,9 @@ def build_browser_zip() -> Path:
 
 
 if __name__ == "__main__":
-    p1 = build_mcpb()
-    p2 = build_browser_zip()
-    print(f"Creat pachet One-Click Claude Desktop (.mcpb): {p1} ({p1.stat().st_size} bytes)")
-    print(f"Creat pachet Extensie Browser (.zip):          {p2} ({p2.stat().st_size} bytes)")
+    p_skill = build_skill_zip()
+    p_mcpb = build_mcpb()
+    p_ext = build_browser_zip()
+    print(f"1. Pachet Custom Skill (Claude Web/Mobile & Gemini Gems): {p_skill} ({p_skill.stat().st_size} bytes)")
+    print(f"2. Pachet Claude Desktop (.mcpb):                         {p_mcpb} ({p_mcpb.stat().st_size} bytes)")
+    print(f"3. Pachet Extensie Browser (.zip):                        {p_ext} ({p_ext.stat().st_size} bytes)")
