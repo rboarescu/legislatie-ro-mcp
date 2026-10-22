@@ -73,6 +73,19 @@ Adăugați în fișierul de configurare MCP (`claude_desktop_config.json` sau `m
 }
 ```
 
+### Modul 4: Remote MCP / OpenAPI pe propriul cont Cloudflare (`cloudflare-worker.js`)
+
+Fiecare utilizator își rulează propria instanță pe contul său Cloudflare (Free Tier) și răspunde de ea. Worker-ul este **privat implicit**: `/mcp` și `/cauta` cer un token.
+
+1. Creați un Worker din `cloudflare-worker.js` (dashboard sau `npx wrangler deploy cloudflare-worker.js --name legislatie-ro`).
+2. Setați secretul **`ACCESS_TOKEN`** (Settings → Variables and Secrets → *Secret*). Pot fi mai multe tokenuri separate prin virgulă, câte unul pentru fiecare persoană, ca să poată fi revocate individual. Generați unul cu `openssl rand -hex 24`.
+3. Trimiteți tokenul prin:
+   - `Authorization: Bearer <token>` (ChatGPT Actions → Authentication → API Key → Bearer),
+   - `X-Api-Key: <token>`, sau
+   - `?key=<token>` în URL, pentru clienții care acceptă doar URL (ex. Custom Connector în claude.ai: `https://<worker>.workers.dev/mcp?key=<token>`).
+
+Fără `ACCESS_TOKEN`, Worker-ul răspunde `503` tuturor. Pentru o instanță publică deliberată, setați variabila `PUBLIC_ACCESS=true` (atenție: oricine poate folosi atunci Worker-ul ca proxy către legislatie.just.ro).
+
 ### Rulare din linia de comandă (Testare / CLI)
 
 ```bash

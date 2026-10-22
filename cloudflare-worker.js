@@ -9,6 +9,13 @@
  *   1. `POST /mcp`         -> Remote MCP Server (JSON-RPC 2.0 Streamable HTTP) pt. Claude Web & Mobile / Cursor / etc.
  *   2. `GET /openapi.json` -> Schema OpenAPI 3.1.0 pt. ChatGPT (Custom GPT Actions) / Gemini Extensions
  *   3. `GET /cauta`        -> Endpoint REST direct (`/cauta?act=OG+2/2001&articole=14,17`)
+ *
+ * Acces privat (implicit): `/mcp` si `/cauta` cer un token din secretul `ACCESS_TOKEN`
+ * (Settings -> Variables and Secrets; mai multe tokenuri separate prin virgula, cate unul per persoana).
+ * Tokenul se trimite ca `Authorization: Bearer <token>`, `X-Api-Key: <token>` sau `?key=<token>`
+ * (ultima varianta pt. clientii care accepta doar URL, ex. Custom Connectors din claude.ai).
+ * Fara `ACCESS_TOKEN` setat, Worker-ul refuza toate cererile, cu exceptia cazului in care
+ * variabila `PUBLIC_ACCESS` este setata explicit la "true".
  */
 
 const SOAP_URL = "https://legislatie.just.ro/apiws/FreeWebService.svc/SOAP";
@@ -73,9 +80,49 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Api-Key, Mcp-Session-Id",
     "Content-Type": "application/json; charset=utf-8"
   };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body, null, 2), { status, headers: corsHeaders() });
+}
+
+async function sha256(s) {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+}
+
+// Comparam digest-urile SHA-256 (lungime fixa) cu timingSafeEqual ca sa nu scurgem tokenul prin timp de raspuns
+async function tokenMatches(candidate, allowed) {
+  const c = await sha256(candidate);
+  let ok = false;
+  for (const t of allowed) {
+    if (crypto.subtle.timingSafeEqual(c, await sha256(t))) ok = true;
+  }
+  return ok;
+}
+
+function extractToken(request, url) {
+  const auth = request.headers.get("Authorization") || "";
+  const bearer = auth.match(/^Bearer\s+(.+)$/i);
+  if (bearer) return bearer[1].trim();
+  return (request.headers.get("X-Api-Key") || url.searchParams.get("key") || "").trim();
+}
+
+// Intoarce null daca cererea e autorizata, altfel raspunsul de eroare
+async function checkAccess(request, url, env) {
+  if (env.PUBLIC_ACCESS === "true") return null;
+  const allowed = String(env.ACCESS_TOKEN || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!allowed.length) {
+    return jsonResponse({ eroare: "Worker neconfigurat: setati secretul ACCESS_TOKEN (sau PUBLIC_ACCESS=true)." }, 503);
+  }
+  const token = extractToken(request, url);
+  if (token && (await tokenMatches(token, allowed))) return null;
+  return jsonResponse({ eroare: "Acces neautorizat." }, 401);
 }
 
 function stripDiacriticsLower(s) {
@@ -343,16 +390,36 @@ const MCP_TOOLS = [
 ];
 
 export default {
-  async fetch(request) {
+  async fetch(request, env = {}) {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders() });
     }
     const url = new URL(request.url);
 
+    if (url.pathname === "/mcp" || url.pathname === "/cauta") {
+      const denied = await checkAccess(request, url, env);
+      if (denied) return denied;
+    }
+
     // 1. Remote MCP Endpoint (Streamable HTTP JSON-RPC 2.0) pentru Claude Web/Mobile, Cursor etc.
+    if (url.pathname === "/mcp" && request.method !== "POST") {
+      return new Response(null, { status: 405, headers: { ...corsHeaders(), Allow: "POST, OPTIONS" } });
+    }
     if (url.pathname === "/mcp" && request.method === "POST") {
-      const msg = await request.json();
+      let msg;
+      try {
+        msg = await request.json();
+      } catch (_) {
+        return jsonResponse({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "JSON invalid" } }, 400);
+      }
       const id = msg.id;
+      // Notificarile JSON-RPC (fara id) nu primesc raspuns
+      if (id === undefined || id === null) {
+        return new Response(null, { status: 202, headers: corsHeaders() });
+      }
+      if (msg.method === "ping") {
+        return jsonResponse({ jsonrpc: "2.0", id, result: {} });
+      }
       if (msg.method === "initialize") {
         return new Response(
           JSON.stringify({
@@ -373,6 +440,10 @@ export default {
         });
       }
       if (msg.method === "tools/call") {
+        const toolName = msg.params && msg.params.name;
+        if (toolName !== MCP_TOOLS[0].name) {
+          return jsonResponse({ jsonrpc: "2.0", id, error: { code: -32602, message: `Unealta necunoscuta: ${toolName}` } });
+        }
         const args = (msg.params && msg.params.arguments) || {};
         const res = await queryLegislatie({
           act: args.act || "",
@@ -388,7 +459,7 @@ export default {
           { headers: corsHeaders() }
         );
       }
-      return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: {} }), { headers: corsHeaders() });
+      return jsonResponse({ jsonrpc: "2.0", id, error: { code: -32601, message: `Metoda nesuportata: ${msg.method}` } });
     }
 
     // 2. OpenAPI 3.1.0 Schema pentru ChatGPT Custom GPT Actions
@@ -401,6 +472,10 @@ export default {
           description: "Cauta autonom legi, OUG, OG, HG, RIL/HP ICCJ si Decizii CCR si extrage articolele consolidate la zi din legislatie.just.ro."
         },
         servers: [{ url: `${url.protocol}//${url.host}` }],
+        components: {
+          securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } }
+        },
+        security: [{ bearerAuth: [] }],
         paths: {
           "/cauta": {
             get: {
