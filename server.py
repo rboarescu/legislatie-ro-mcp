@@ -70,17 +70,17 @@ ALIASURI_ACTE: dict[str, dict[str, str]] = {
     "codul administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
     "oug 57/2019": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
     "cod administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
-    "codul muncii": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "41625"},
-    "legea 53/2003": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "41625"},
+    "codul muncii": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "309240"},
+    "legea 53/2003": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "309240"},
     "codul civil": {"numar": "287", "an": "2009", "titlu": "Codul civil", "doc_id": "109884"},
-    "codul de procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "120611"},
-    "cod procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "120611"},
+    "codul de procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "304485"},
+    "cod procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "304485"},
     "codul penal": {"numar": "286", "an": "2009", "titlu": "Codul penal", "doc_id": "109855"},
-    "codul de procedura penala": {"numar": "135", "an": "2010", "titlu": "Codul de procedură penală", "doc_id": "120612"},
+    "codul de procedura penala": {"numar": "135", "an": "2010", "titlu": "Codul de procedură penală", "doc_id": "310738"},
     "codul fiscal": {"numar": "227", "an": "2015", "titlu": "Codul fiscal", "doc_id": "171282"},
-    "codul de procedura fiscala": {"numar": "207", "an": "2015", "titlu": "Codul de procedură fiscală", "doc_id": "170011"},
-    "codul rutier": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41023"},
-    "oug 195/2002": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41023"},
+    "codul de procedura fiscala": {"numar": "207", "an": "2015", "titlu": "Codul de procedură fiscală", "doc_id": "312603"},
+    "codul rutier": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41006"},
+    "oug 195/2002": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41006"},
     "codul silvic": {"numar": "331", "an": "2024", "titlu": "Codul silvic"},
     "codul urbanismului": {"numar": "169", "an": "2026", "titlu": "amenajării teritoriului, urbanismului și construcțiilor"},
     "catuc": {"numar": "169", "an": "2026", "titlu": "amenajării teritoriului, urbanismului și construcțiilor"},
@@ -89,19 +89,19 @@ ALIASURI_ACTE: dict[str, dict[str, str]] = {
     "legea 554/2004": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ", "doc_id": "57426"},
     "legea locuintei": {"numar": "114", "an": "1996", "titlu": "legea locuinţei", "tip_act": "LEGE", "doc_id": "8597"},
     "legea 114/1996": {"numar": "114", "an": "1996", "titlu": "legea locuinţei", "tip_act": "LEGE", "doc_id": "8597"},
-    "legea societatilor": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "737"},
-    "legea 31/1990": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "737"},
+    "legea societatilor": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "798"},
+    "legea 31/1990": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "798"},
     "legea urbanismului": {"numar": "350", "an": "2001", "titlu": "amenajarea teritoriului", "tip_act": "LEGE", "doc_id": "29453"},
     "legea 350/2001": {"numar": "350", "an": "2001", "titlu": "amenajarea teritoriului", "tip_act": "LEGE", "doc_id": "29453"},
-    "autorizarea constructiilor": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1449"},
-    "legea 50/1991": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1449"},
+    "autorizarea constructiilor": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1515"},
+    "legea 50/1991": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1515"},
     "regimul contraventiilor": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
     "og 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
     "og nr. 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
     "ordonanta 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
-    "stare civila": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8613"},
-    "legea 119/1996": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8613"},
-    "legea 7/1996": {"numar": "7", "an": "1996", "titlu": "cadastrului şi a publicităţii imobiliare", "tip_act": "LEGE", "doc_id": "7863"},
+    "stare civila": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8624"},
+    "legea 119/1996": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8624"},
+    "legea 7/1996": {"numar": "7", "an": "1996", "titlu": "cadastrului şi a publicităţii imobiliare", "tip_act": "LEGE", "doc_id": "7798"},
     "asociatii de proprietari": {"numar": "196", "an": "2018", "titlu": "asociaţiilor de proprietari", "tip_act": "LEGE", "doc_id": "203233"},
     "legea 196/2018": {"numar": "196", "an": "2018", "titlu": "asociaţiilor de proprietari", "tip_act": "LEGE", "doc_id": "203233"},
     "accesul la informatii de interes public": {"numar": "544", "an": "2001", "titlu": "liberul acces la informaţiile de interes public", "tip_act": "LEGE", "doc_id": "31413"},
@@ -1088,16 +1088,26 @@ class LegislatieMCPTools:
         if row and row["cnt"] > 0:
             return
 
-        https_link = re.sub(r"^http://", "https://", link)
-        try:
+        def fetch_html(url: str) -> str:
             self.client._throttle()
             req = urllib.request.Request(
-                https_link,
+                re.sub(r"^http://", "https://", url),
                 headers={"User-Agent": "legislatie-ro-mcp/1.0 (Consolidated View Reader)"},
             )
             with urllib.request.urlopen(req, timeout=20.0) as resp:
-                raw_html = resp.read().decode("utf-8", errors="replace")
+                return resp.read().decode("utf-8", errors="replace")
+
+        try:
+            raw_html = fetch_html(link)
             consolidated_arts = parse_articles_from_consolidated_html(raw_html)
+            # Legile de aprobare/republicare a Codurilor contin doar o trimitere (.S_REF) catre textul Codului
+            ref = None if consolidated_arts else re.search(
+                r'class="S_REF"><A href="[^"]*DetaliiDocumentAfis/(\d+)', raw_html, flags=re.IGNORECASE
+            )
+            if ref:
+                consolidated_arts = parse_articles_from_consolidated_html(
+                    fetch_html(f"https://legislatie.just.ro/Public/DetaliiDocument/{ref.group(1)}")
+                )
             if consolidated_arts:
                 with self.cache.conn:
                     self.cache.conn.execute("DELETE FROM articles WHERE act_key = ?", (act_key,))

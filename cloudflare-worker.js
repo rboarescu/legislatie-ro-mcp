@@ -33,17 +33,17 @@ const ALIASURI = {
   "codul administrativ": { numar: "57", an: "2019", titlu: "Codul administrativ", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "215925" },
   "oug 57/2019": { numar: "57", an: "2019", titlu: "Codul administrativ", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "215925" },
   "cod administrativ": { numar: "57", an: "2019", titlu: "Codul administrativ", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "215925" },
-  "codul muncii": { numar: "53", an: "2003", titlu: "Codul muncii", tip_act: "LEGE", doc_id: "41625" },
-  "legea 53/2003": { numar: "53", an: "2003", titlu: "Codul muncii", tip_act: "LEGE", doc_id: "41625" },
+  "codul muncii": { numar: "53", an: "2003", titlu: "Codul muncii", tip_act: "LEGE", doc_id: "309240" },
+  "legea 53/2003": { numar: "53", an: "2003", titlu: "Codul muncii", tip_act: "LEGE", doc_id: "309240" },
   "codul civil": { numar: "287", an: "2009", titlu: "Codul civil", tip_act: "LEGE", doc_id: "109884" },
-  "codul de procedura civila": { numar: "134", an: "2010", titlu: "Codul de procedură civilă", tip_act: "LEGE", doc_id: "120611" },
-  "cod procedura civila": { numar: "134", an: "2010", titlu: "Codul de procedură civilă", tip_act: "LEGE", doc_id: "120611" },
+  "codul de procedura civila": { numar: "134", an: "2010", titlu: "Codul de procedură civilă", tip_act: "LEGE", doc_id: "304485" },
+  "cod procedura civila": { numar: "134", an: "2010", titlu: "Codul de procedură civilă", tip_act: "LEGE", doc_id: "304485" },
   "codul penal": { numar: "286", an: "2009", titlu: "Codul penal", tip_act: "LEGE", doc_id: "109855" },
-  "codul de procedura penala": { numar: "135", an: "2010", titlu: "Codul de procedură penală", tip_act: "LEGE", doc_id: "120612" },
+  "codul de procedura penala": { numar: "135", an: "2010", titlu: "Codul de procedură penală", tip_act: "LEGE", doc_id: "310738" },
   "codul fiscal": { numar: "227", an: "2015", titlu: "Codul fiscal", tip_act: "LEGE", doc_id: "171282" },
-  "codul de procedura fiscala": { numar: "207", an: "2015", titlu: "Codul de procedură fiscală", tip_act: "LEGE", doc_id: "170011" },
-  "codul rutier": { numar: "195", an: "2002", titlu: "circulația pe drumurile publice", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "41023" },
-  "oug 195/2002": { numar: "195", an: "2002", titlu: "circulația pe drumurile publice", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "41023" },
+  "codul de procedura fiscala": { numar: "207", an: "2015", titlu: "Codul de procedură fiscală", tip_act: "LEGE", doc_id: "312603" },
+  "codul rutier": { numar: "195", an: "2002", titlu: "circulația pe drumurile publice", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "41006" },
+  "oug 195/2002": { numar: "195", an: "2002", titlu: "circulația pe drumurile publice", tip_act: "ORDONANȚĂ DE URGENȚĂ", doc_id: "41006" },
   "codul urbanismului": { numar: "169", an: "2026", titlu: "amenajării teritoriului, urbanismului și construcțiilor", tip_act: "LEGE" },
   "catuc": { numar: "169", an: "2026", titlu: "amenajării teritoriului, urbanismului și construcțiilor", tip_act: "LEGE" },
   "contencios administrativ": { numar: "554", an: "2004", titlu: "contenciosului administrativ", tip_act: "LEGE", doc_id: "57426" },
@@ -51,19 +51,19 @@ const ALIASURI = {
   "legea 554/2004": { numar: "554", an: "2004", titlu: "contenciosului administrativ", tip_act: "LEGE", doc_id: "57426" },
   "legea locuintei": { numar: "114", an: "1996", titlu: "legea locuinţei", tip_act: "LEGE", doc_id: "8597" },
   "legea 114/1996": { numar: "114", an: "1996", titlu: "legea locuinţei", tip_act: "LEGE", doc_id: "8597" },
-  "legea societatilor": { numar: "31", an: "1990", titlu: "societăţilor", tip_act: "LEGE", doc_id: "737" },
-  "legea 31/1990": { numar: "31", an: "1990", titlu: "societăţilor", tip_act: "LEGE", doc_id: "737" },
+  "legea societatilor": { numar: "31", an: "1990", titlu: "societăţilor", tip_act: "LEGE", doc_id: "798" },
+  "legea 31/1990": { numar: "31", an: "1990", titlu: "societăţilor", tip_act: "LEGE", doc_id: "798" },
   "legea urbanismului": { numar: "350", an: "2001", titlu: "amenajarea teritoriului", tip_act: "LEGE", doc_id: "29453" },
   "legea 350/2001": { numar: "350", an: "2001", titlu: "amenajarea teritoriului", tip_act: "LEGE", doc_id: "29453" },
-  "autorizarea constructiilor": { numar: "50", an: "1991", titlu: "autorizarea executării lucrărilor de construcţii", tip_act: "LEGE", doc_id: "1449" },
-  "legea 50/1991": { numar: "50", an: "1991", titlu: "autorizarea executării lucrărilor de construcţii", tip_act: "LEGE", doc_id: "1449" },
+  "autorizarea constructiilor": { numar: "50", an: "1991", titlu: "autorizarea executării lucrărilor de construcţii", tip_act: "LEGE", doc_id: "1515" },
+  "legea 50/1991": { numar: "50", an: "1991", titlu: "autorizarea executării lucrărilor de construcţii", tip_act: "LEGE", doc_id: "1515" },
   "regimul contraventiilor": { numar: "2", an: "2001", titlu: "regimul juridic al contravenţiilor", tip_act: "ORDONANȚĂ", doc_id: "29779" },
   "og 2/2001": { numar: "2", an: "2001", titlu: "regimul juridic al contravenţiilor", tip_act: "ORDONANȚĂ", doc_id: "29779" },
   "og nr. 2/2001": { numar: "2", an: "2001", titlu: "regimul juridic al contravenţiilor", tip_act: "ORDONANȚĂ", doc_id: "29779" },
   "ordonanta 2/2001": { numar: "2", an: "2001", titlu: "regimul juridic al contravenţiilor", tip_act: "ORDONANȚĂ", doc_id: "29779" },
-  "stare civila": { numar: "119", an: "1996", titlu: "actele de stare civilă", tip_act: "LEGE", doc_id: "8613" },
-  "legea 119/1996": { numar: "119", an: "1996", titlu: "actele de stare civilă", tip_act: "LEGE", doc_id: "8613" },
-  "legea 7/1996": { numar: "7", an: "1996", titlu: "cadastrului şi a publicităţii imobiliare", tip_act: "LEGE", doc_id: "7863" },
+  "stare civila": { numar: "119", an: "1996", titlu: "actele de stare civilă", tip_act: "LEGE", doc_id: "8624" },
+  "legea 119/1996": { numar: "119", an: "1996", titlu: "actele de stare civilă", tip_act: "LEGE", doc_id: "8624" },
+  "legea 7/1996": { numar: "7", an: "1996", titlu: "cadastrului şi a publicităţii imobiliare", tip_act: "LEGE", doc_id: "7798" },
   "asociatii de proprietari": { numar: "196", an: "2018", titlu: "asociaţiilor de proprietari", tip_act: "LEGE", doc_id: "203233" },
   "legea 196/2018": { numar: "196", an: "2018", titlu: "asociaţiilor de proprietari", tip_act: "LEGE", doc_id: "203233" },
   "accesul la informatii de interes public": { numar: "544", an: "2001", titlu: "liberul acces la informaţiile de interes public", tip_act: "LEGE", doc_id: "31413" },
@@ -379,17 +379,109 @@ function resolveAct(actStr) {
   for (const [k, v] of Object.entries(ALIASURI)) {
     if (norm.includes(k)) return v;
   }
-  const m = norm.match(/\b(?:(legea|lege|oug|o\.u\.g\.|og|o\.g\.|hg|h\.g\.|ordinul|ordin|decizia)\s*)?(?:nr\.\s*)?([0-9]{1,5})\s*(?:\/|\s+din\s+)((?:19|20)[0-9]{2})\b/);
+  const prefixRe = "(legea|lege|oug|o\\.u\\.g\\.|og|o\\.g\\.|hg|h\\.g\\.|hotararea|ordinul|ordin|decizia)";
+  let m = norm.match(new RegExp(`\\b(?:${prefixRe}\\s*)?(?:nr\\.\\s*)?([0-9]{1,5})\\s*(?:\\/|\\s+din\\s+)(?:[0-9]{1,2}[./][0-9]{1,2}[./])?((?:19|20)[0-9]{2})\\b`));
+  // Fara an (ex: "HG 859"): retinem tipul si numarul; anul se clarifica din lista de candidati
+  if (!m) {
+    const m2 = norm.match(new RegExp(`\\b${prefixRe}\\s*(?:nr\\.\\s*)?([0-9]{1,5})\\b`));
+    if (m2) m = [m2[0], m2[1], m2[2], ""];
+  }
   if (m) {
     const p = (m[1] || "").replace(/\./g, "");
     let tip_act = "";
     if (p === "oug") tip_act = "ORDONANȚĂ DE URGENȚĂ";
     else if (p === "og") tip_act = "ORDONANȚĂ";
-    else if (p === "hg") tip_act = "HOTĂRÂRE";
+    else if (p === "hg" || p === "hotararea") tip_act = "HOTĂRÂRE";
     else if (p.startsWith("leg")) tip_act = "LEGE";
+    else if (p.startsWith("ordin")) tip_act = "ORDIN";
     return { numar: m[2], an: m[3], titlu: "", tip_act, doc_id: "" };
   }
   return { numar: "", an: "", titlu: actStr, tip_act: "", doc_id: "" };
+}
+
+// Cuvinte fara valoare de cautare (dupa eliminarea diacriticelor)
+const STOPWORDS = new Set(
+  "de la si in din pe pt pentru cu fara a al ale ai o un unei unui care ce sa se nu sau iar daca cand prin privind despre fata dupa catre spre este sunt fi mai cel cea cei cele acest aceasta lege legea art articol articolul alin hg oug og nr".split(" ")
+);
+// Terminatii flexionare frecvente in romana (cele mai lungi primele): "termenele" -> "termen", "topografie" -> "topograf"
+const SUFFIXES = ["urilor", "elor", "ilor", "ului", "uri", "ele", "ile", "iei", "ii", "ie", "ia", "ea", "ul", "le", "a", "e", "i", "u"];
+
+function stemRo(token) {
+  for (const s of SUFFIXES) {
+    if (token.endsWith(s) && token.length - s.length >= 4) return token.slice(0, -s.length);
+  }
+  return token;
+}
+
+function searchStems(query) {
+  const tokens = stripDiacriticsLower(query).split(/[^a-z0-9]+/).filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+  return [...new Set(tokens.map(stemRo))];
+}
+
+// Clasament pe articole: fiecare radacina gasita la inceput de cuvant valoreaza mai mult cu cat e mai rara in act (IDF)
+function rankArticles(arts, query) {
+  const stems = searchStems(query);
+  if (!stems.length) return { stems, ranked: [] };
+  const docs = arts.map((a) => stripDiacriticsLower(`${a.content}\n${(a.notes || []).join("\n")}`));
+  const res = stems.map((s) => new RegExp(`\\b${s}`, "g"));
+  const df = res.map((re) => docs.filter((d) => d.search(re) >= 0).length);
+  const ranked = [];
+  docs.forEach((d, i) => {
+    let score = 0;
+    const found = [];
+    res.forEach((re, k) => {
+      const hits = (d.match(re) || []).length;
+      if (!hits) return;
+      found.push(stems[k]);
+      score += Math.log(1 + arts.length / df[k]) * (1 + Math.log(hits));
+    });
+    if (found.length) ranked.push({ idx: i, score, found });
+  });
+  ranked.sort((a, b) => b.score - a.score || a.idx - b.idx);
+  return { stems, ranked };
+}
+
+function articleSummary(a) {
+  const lines = a.content.split("\n");
+  const rest = lines.slice(1).join(" ");
+  return `${a.label}: ${rest.length > 90 ? rest.slice(0, 90) + "…" : rest}`;
+}
+
+// "11 alin. (2) lit. c), 38-40" -> ["11", "38", "39", "40"]
+function parseRequestedArticles(articole) {
+  const cleaned = stripDiacriticsLower(articole)
+    .replace(/\b(?:alin(?:eatul)?|lit(?:era)?|pct|punctul|teza)\.?\s*\(?[0-9a-z^]+\)?/g, " ")
+    .replace(/\b(?:articolele|articolul|art)\.?/g, " ");
+  const out = [];
+  for (const part of cleaned.split(/[,;]+|\s+si\s+/)) {
+    const range = part.trim().match(/^(\d+)\s*[-–]\s*(\d+)$/);
+    if (range) {
+      for (let n = +range[1]; n <= Math.min(+range[2], +range[1] + 30); n++) out.push(String(n));
+      continue;
+    }
+    out.push(...(part.match(/[0-9]+(?:\^[0-9]+)?/g) || []));
+  }
+  return [...new Set(out)];
+}
+
+const INSTRUCTIUNI_MODEL =
+  "Citeaza si rezuma DOAR din textul din `articole_extrase`. Daca informatia ceruta (termene, documente, institutii) " +
+  "nu apare in acest text, spune explicit ca nu ai gasit-o in act si NU o completa din memorie. Pentru alte articole " +
+  "reapeleaza unealta cu `articole` (vezi `cuprins_articole`) sau cu alti termeni, in limbajul legii " +
+  "(ex: 'aeronave fara pilot' in loc de 'drone').";
+
+// Unele acte (ex: legile de aprobare/republicare a Codurilor) au in forma consolidata doar o trimitere (.S_REF)
+// catre documentul cu textul propriu-zis; urmam o singura trimitere cand pagina nu are articole.
+async function fetchConsolidatedArticles(link) {
+  const get = (u) =>
+    fetch(u.replace(/^http:\/\//i, "https://"), { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } }).then((r) => r.text());
+  const rawHtml = await get(link);
+  const arts = parseArticlesFromConsolidatedHtml(rawHtml);
+  if (arts.length) return { arts, link };
+  const ref = rawHtml.match(/class="S_REF"><A href="[^"]*DetaliiDocumentAfis\/(\d+)/i);
+  if (!ref) return { arts, link };
+  const refLink = `https://legislatie.just.ro/Public/DetaliiDocument/${ref[1]}`;
+  return { arts: parseArticlesFromConsolidatedHtml(await get(refLink)), link: refLink };
 }
 
 async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) {
@@ -397,11 +489,9 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
   let best = null;
   let allArts = [];
 
-  if (resolved.doc_id && !cuvinte_cheie) {
-    const link = `https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`;
-    const r = await fetch(link, { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } });
-    const rawHtml = await r.text();
-    allArts = parseArticlesFromConsolidatedHtml(rawHtml);
+  if (resolved.doc_id) {
+    const { arts, link } = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`);
+    allArts = arts;
     best = {
       tip_act: resolved.tip_act || "ACT NORMATIV",
       numar: resolved.numar,
@@ -410,16 +500,60 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
       link_oficial: link
     };
   } else {
-    let items = await soapSearch({
-      an: resolved.an,
-      numar: resolved.numar,
-      titlu: !resolved.numar && !resolved.an ? resolved.titlu : "",
-      text: !act ? cuvinte_cheie : ""
-    });
-    if (resolved.tip_act && items.length) {
+    const filterItems = (items) => {
+      if (resolved.tip_act && items.length) {
+        const exp = stripDiacriticsLower(resolved.tip_act);
+        const exact = items.filter((x) => stripDiacriticsLower(x.tip_act) === exp);
+        if (exact.length) items = exact;
+      }
+      if (resolved.numar) {
+        const sameNum = items.filter((x) => x.numar === resolved.numar);
+        if (sameNum.length) items = sameNum;
+      }
+      return items;
+    };
+
+    let items = [];
+    if (resolved.numar && !resolved.an) {
+      // Numar fara an: API-ul intoarce max. 20 de rezultate, cele mai vechi primele, deci lista completa nu e accesibila.
+      // Restrangem cu cuvintele-cheie (cautare in textul actelor); altfel cerem anul in loc sa ghicim.
       const exp = stripDiacriticsLower(resolved.tip_act);
-      const exact = items.filter((x) => stripDiacriticsLower(x.tip_act) === exp);
-      if (exact.length) items = exact;
+      // Intai toata fraza, apoi primele cuvinte semnificative pe rand
+      const words = cuvinte_cheie.split(/\s+/).filter((t) => t.length >= 4 && !STOPWORDS.has(stripDiacriticsLower(t)));
+      const tries = cuvinte_cheie ? [cuvinte_cheie, ...(words.length > 1 ? words.slice(0, 3) : [])] : [];
+      const seen = new Map();
+      for (const text of tries) {
+        for (const x of await soapSearch({ numar: resolved.numar, text })) {
+          if (x.numar === resolved.numar && (!exp || stripDiacriticsLower(x.tip_act) === exp)) seen.set(x.link_oficial, x);
+        }
+        if (seen.size) break;
+      }
+      items = [...seen.values()];
+      if (items.length !== 1) {
+        return {
+          ambiguu: true,
+          mesaj:
+            `Exista mai multe acte cu numarul ${resolved.numar} (din ani diferiti)` +
+            (items.length ? ", iar cuvintele-cheie se potrivesc cu mai multe dintre ele (vezi candidati)." : " si cuvintele-cheie nu au restrans cautarea.") +
+            ` Reapeleaza unealta cu anul (ex: '${act.trim()}/2021'). Daca anul nu reiese din context, intreaba utilizatorul; NU presupune continutul actului.`,
+          candidati: items.map((x) => ({
+            act: `${x.tip_act} nr. ${x.numar}`,
+            data: x.data_vigoare,
+            titlu: x.titlu.slice(0, 200),
+            link_oficial: x.link_oficial
+          })),
+          disclaimer: DISCLAIMER_LEGAL
+        };
+      }
+    } else {
+      items = filterItems(
+        await soapSearch({
+          an: resolved.an,
+          numar: resolved.numar,
+          titlu: !resolved.numar && !resolved.an ? resolved.titlu : "",
+          text: !act ? cuvinte_cheie : ""
+        })
+      );
     }
     if (!items.length) {
       return { eroare: `Nu s-au gasit acte normative pentru '${act}' / '${cuvinte_cheie}'.`, disclaimer: DISCLAIMER_LEGAL };
@@ -427,10 +561,9 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
     best = [...items].sort((a, b) => (b.text || "").length - (a.text || "").length)[0];
     if (best.link_oficial) {
       try {
-        const httpsUrl = best.link_oficial.replace(/^http:\/\//i, "https://");
-        const r = await fetch(httpsUrl, { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } });
-        const rawHtml = await r.text();
-        allArts = parseArticlesFromConsolidatedHtml(rawHtml);
+        const { arts, link } = await fetchConsolidatedArticles(best.link_oficial);
+        allArts = arts;
+        if (arts.length) best = { ...best, link_oficial: link };
       } catch (_) {}
     }
     if (!allArts.length) {
@@ -438,8 +571,9 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
     }
   }
 
-  const reqNums = (articole.match(/[0-9]+(?:\^[0-9]+)?/g) || []).map((x) => x.toLowerCase());
+  const reqNums = parseRequestedArticles(articole);
   let selected = [];
+  let cautare = null;
   if (reqNums.length) {
     allArts.forEach((a, i) => {
       if (reqNums.includes(a.num)) {
@@ -447,11 +581,22 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
         if (reqNums.length === 1 && i + 1 < allArts.length) selected.push(allArts[i + 1]);
       }
     });
+    const missing = reqNums.filter((n) => !allArts.some((a) => a.num === n));
+    if (missing.length) cautare = { articole_negasite: missing };
   } else if (cuvinte_cheie) {
-    const terms = stripDiacriticsLower(cuvinte_cheie).split(/\s+/).filter((t) => t.length >= 3);
-    selected = allArts.filter((a) => terms.some((t) => stripDiacriticsLower(a.content).includes(t))).slice(0, 6);
+    const { stems, ranked } = rankArticles(allArts, cuvinte_cheie);
+    selected = ranked.slice(0, 5).map((r) => allArts[r.idx]);
+    cautare = {
+      termeni_cautati: stems,
+      articole_potrivite: ranked.length,
+      clasament: ranked.slice(0, 10).map((r) => ({ articol: allArts[r.idx].label, termeni_gasiti: r.found })),
+      ...(ranked.length
+        ? {}
+        : { mesaj: `Niciun articol din act nu contine termenii [${stems.join(", ")}]. Incearca termenii folositi de lege sau alege din cuprins_articole.` })
+    };
+  } else {
+    selected = allArts.slice(0, 4);
   }
-  if (!selected.length) selected = allArts.slice(0, 4);
 
   return {
     act: {
@@ -461,7 +606,12 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
       titlu: best.titlu,
       link_oficial: best.link_oficial
     },
+    numar_articole_in_act: allArts.length,
+    ...(cautare ? { cautare } : {}),
     articole_extrase: selected,
+    // Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
+    ...(allArts.length <= 80 ? { cuprins_articole: allArts.map(articleSummary) } : {}),
+    instructiuni_model: INSTRUCTIUNI_MODEL,
     disclaimer: DISCLAIMER_LEGAL
   };
 }
@@ -470,13 +620,19 @@ const MCP_TOOLS = [
   {
     name: "cauta_si_extrage_legislatie_ro",
     description:
-      "Cauta in baza oficiala legislatie.just.ro (Legi, Coduri, OUG, OG, HG, Ordine, RIL/HP ICCJ, Decizii CCR) si extrage forma consolidata la zi a articolelor sau fragmentele relevante dupa cuvinte-cheie.",
+      "Cauta in baza oficiala legislatie.just.ro (Legi, Coduri, OUG, OG, HG, Ordine, RIL/HP ICCJ, Decizii CCR) si extrage forma consolidata la zi " +
+      "a articolelor cerute sau a articolelor cele mai relevante pentru cuvintele-cheie. Raspunsul include `cuprins_articole` (harta actului) " +
+      "pentru apeluri ulterioare tintite. Daca actul are numar fara an si exista mai multe, primesti `candidati` si trebuie sa reapelezi cu anul. " +
+      "Raspunde utilizatorului doar pe baza textului returnat.",
     inputSchema: {
       type: "object",
       properties: {
-        act: { type: "string", description: "Ex: 'Legea 114/1996', 'OG 2/2001', 'OUG 57/2019', 'Codul administrativ', 'Legea 554/2004'" },
-        articole: { type: "string", description: "Articolele dorite (ex: '38, 39', '14, 17', '11')" },
-        cuvinte_cheie: { type: "string", description: "Cuvinte-cheie juridice cautate in lege (fara date personale)" }
+        act: { type: "string", description: "Tip, numar si AN: ex. 'Legea 114/1996', 'HG 859/2021', 'OG 2/2001', 'OUG 57/2019' sau 'Codul administrativ'" },
+        articole: { type: "string", description: "Articolele dorite (ex: '38, 39', '14-17', '11'); alineatele/literele se ignora, se returneaza articolul intreg" },
+        cuvinte_cheie: {
+          type: "string",
+          description: "Termeni cautati in lege, in limbajul legii (ex: 'aeronave fara pilot fotografiere' in loc de 'drone'); fara date personale"
+        }
       }
     }
   }
@@ -521,7 +677,11 @@ export default {
             result: {
               protocolVersion: (msg.params && msg.params.protocolVersion) || "2024-11-05",
               capabilities: { tools: { listChanged: false } },
-              serverInfo: { name: "legislatie-ro-mcp-cloudflare", version: "1.0.0" }
+              serverInfo: { name: "legislatie-ro-mcp-cloudflare", version: "1.0.0" },
+              instructions:
+                "Conector catre legislatia consolidata la zi a Romaniei (legislatie.just.ro). Nu cita din memorie texte de lege; " +
+                "verifica-le cu unealta. Raspunde doar pe baza articolelor returnate, cu linkul oficial. Daca textul returnat nu " +
+                "contine raspunsul, spune asta si cauta din nou (alte articole din cuprins sau alti termeni). Nu trimite date personale."
             }
           }),
           { headers: corsHeaders() }
