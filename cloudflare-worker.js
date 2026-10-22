@@ -76,6 +76,89 @@ const ALIASURI = {
 let cachedToken = null;
 let cachedTokenTs = 0;
 
+// ============================================================================
+// Cache in doua niveluri, fara configurare (nu necesita KV):
+// 1. memoria izolatului: LRU cu actele deja parsate (zero CPU la potrivire; util in aceeasi conversatie);
+// 2. Cache API (per centru de date): articolele parsate ca JSON, ca sa nu reparsam HTML-ul (zeci de ms CPU la Coduri).
+// Cheile includ PARSER_VERSION, deci o versiune noua a parserului invalideaza automat cache-ul.
+// ============================================================================
+
+const PARSER_VERSION = "2026-10-22.1";
+const DOC_TTL_SEC = 24 * 3600;
+const SEARCH_TTL_SEC = 12 * 3600;
+const MEMORY_TTL_MS = 6 * 3600 * 1000;
+const MEMORY_MAX_CHARS = 20_000_000; // ~40 MB (sirurile cu diacritice ocupa 2 octeti/caracter) din cei 128 MB ai izolatului
+
+const memoryCache = new Map(); // cheie -> { value, size, expires }; ordinea de inserare = ordinea LRU
+let memoryChars = 0;
+
+function memoryGet(key) {
+  const entry = memoryCache.get(key);
+  if (!entry) return undefined;
+  memoryCache.delete(key);
+  if (entry.expires < Date.now()) {
+    memoryChars -= entry.size;
+    return undefined;
+  }
+  memoryCache.set(key, entry);
+  return entry.value;
+}
+
+function memorySet(key, value, size) {
+  if (size > MEMORY_MAX_CHARS / 2) return;
+  const old = memoryCache.get(key);
+  if (old) {
+    memoryChars -= old.size;
+    memoryCache.delete(key);
+  }
+  memoryCache.set(key, { value, size, expires: Date.now() + MEMORY_TTL_MS });
+  memoryChars += size;
+  for (const [k, e] of memoryCache) {
+    if (memoryChars <= MEMORY_MAX_CHARS) break;
+    memoryCache.delete(k);
+    memoryChars -= e.size;
+  }
+}
+
+function cacheApiKey(key) {
+  return new Request(`https://cache.legislatie-ro-mcp.internal/${PARSER_VERSION}/${encodeURIComponent(key)}`);
+}
+
+// cc = { ctx, stats }: ctx.waitUntil scrie in Cache API dupa raspuns; stats aduna sursa fiecarei piese (antet X-Legis-Cache)
+async function cached(key, ttlSec, cc, produce, shouldStore = () => true) {
+  const hit = memoryGet(key);
+  if (hit !== undefined) {
+    cc.stats.push(`${key.split(":")[0]}=memorie`);
+    return hit;
+  }
+  const cacheApi = typeof caches !== "undefined" ? caches.default : null;
+  if (cacheApi) {
+    try {
+      const res = await cacheApi.match(cacheApiKey(key));
+      if (res) {
+        const body = await res.text();
+        const value = JSON.parse(body);
+        memorySet(key, value, body.length);
+        cc.stats.push(`${key.split(":")[0]}=cache-api`);
+        return value;
+      }
+    } catch (_) {}
+  }
+  const value = await produce();
+  cc.stats.push(`${key.split(":")[0]}=sursa`);
+  if (shouldStore(value)) {
+    const body = JSON.stringify(value);
+    memorySet(key, value, body.length);
+    if (cacheApi && cc.ctx) {
+      const res = new Response(body, {
+        headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": `public, max-age=${ttlSec}` }
+      });
+      cc.ctx.waitUntil(cacheApi.put(cacheApiKey(key), res).catch(() => {}));
+    }
+  }
+  return value;
+}
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -338,7 +421,13 @@ function optXml(tag, val) {
   return v ? `<d4p1:${tag}>${escapeXml(v)}</d4p1:${tag}>` : `<d4p1:${tag} i:nil="true" />`;
 }
 
-async function soapSearch({ an = "", numar = "", text = "", titlu = "", perPage = 15 }) {
+// Rezultatele goale nu se pastreaza (pot fi o eroare temporara a API-ului)
+function soapSearch(params, cc) {
+  const { an = "", numar = "", text = "", titlu = "" } = params;
+  return cached(`cautare:${JSON.stringify([an, numar, text, titlu])}`, SEARCH_TTL_SEC, cc, () => soapSearchRaw(params), (items) => items.length > 0);
+}
+
+async function soapSearchRaw({ an = "", numar = "", text = "", titlu = "", perPage = 15 }) {
   const token = await getSoapToken(false);
   const env = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
@@ -472,7 +561,12 @@ const INSTRUCTIUNI_MODEL =
 
 // Unele acte (ex: legile de aprobare/republicare a Codurilor) au in forma consolidata doar o trimitere (.S_REF)
 // catre documentul cu textul propriu-zis; urmam o singura trimitere cand pagina nu are articole.
-async function fetchConsolidatedArticles(link) {
+function fetchConsolidatedArticles(link, cc) {
+  const docId = (link.match(/(\d+)\s*$/) || [])[1] || link;
+  return cached(`act:${docId}`, DOC_TTL_SEC, cc, () => fetchConsolidatedArticlesRaw(link), (r) => r.arts.length > 0);
+}
+
+async function fetchConsolidatedArticlesRaw(link) {
   const get = (u) =>
     fetch(u.replace(/^http:\/\//i, "https://"), { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } }).then((r) => r.text());
   const rawHtml = await get(link);
@@ -484,13 +578,13 @@ async function fetchConsolidatedArticles(link) {
   return { arts: parseArticlesFromConsolidatedHtml(await get(refLink)), link: refLink };
 }
 
-async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) {
+async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, cc = { ctx: null, stats: [] }) {
   const resolved = resolveAct(act);
   let best = null;
   let allArts = [];
 
   if (resolved.doc_id) {
-    const { arts, link } = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`);
+    const { arts, link } = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`, cc);
     allArts = arts;
     best = {
       tip_act: resolved.tip_act || "ACT NORMATIV",
@@ -523,7 +617,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
       const tries = cuvinte_cheie ? [cuvinte_cheie, ...(words.length > 1 ? words.slice(0, 3) : [])] : [];
       const seen = new Map();
       for (const text of tries) {
-        for (const x of await soapSearch({ numar: resolved.numar, text })) {
+        for (const x of await soapSearch({ numar: resolved.numar, text }, cc)) {
           if (x.numar === resolved.numar && (!exp || stripDiacriticsLower(x.tip_act) === exp)) seen.set(x.link_oficial, x);
         }
         if (seen.size) break;
@@ -552,7 +646,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
           numar: resolved.numar,
           titlu: !resolved.numar && !resolved.an ? resolved.titlu : "",
           text: !act ? cuvinte_cheie : ""
-        })
+        }, cc)
       );
     }
     if (!items.length) {
@@ -561,7 +655,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }) 
     best = [...items].sort((a, b) => (b.text || "").length - (a.text || "").length)[0];
     if (best.link_oficial) {
       try {
-        const { arts, link } = await fetchConsolidatedArticles(best.link_oficial);
+        const { arts, link } = await fetchConsolidatedArticles(best.link_oficial, cc);
         allArts = arts;
         if (arts.length) best = { ...best, link_oficial: link };
       } catch (_) {}
@@ -639,7 +733,7 @@ const MCP_TOOLS = [
 ];
 
 export default {
-  async fetch(request, env = {}) {
+  async fetch(request, env = {}, ctx = null) {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders() });
     }
@@ -698,18 +792,18 @@ export default {
           return jsonResponse({ jsonrpc: "2.0", id, error: { code: -32602, message: `Unealta necunoscuta: ${toolName}` } });
         }
         const args = (msg.params && msg.params.arguments) || {};
-        const res = await queryLegislatie({
-          act: args.act || "",
-          articole: args.articole || "",
-          cuvinte_cheie: args.cuvinte_cheie || ""
-        });
+        const cc = { ctx, stats: [] };
+        const res = await queryLegislatie(
+          { act: args.act || "", articole: args.articole || "", cuvinte_cheie: args.cuvinte_cheie || "" },
+          cc
+        );
         return new Response(
           JSON.stringify({
             jsonrpc: "2.0",
             id,
             result: { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: false }
           }),
-          { headers: corsHeaders() }
+          { headers: { ...corsHeaders(), "X-Legis-Cache": cc.stats.join(", ") } }
         );
       }
       return jsonResponse({ jsonrpc: "2.0", id, error: { code: -32601, message: `Metoda nesuportata: ${msg.method}` } });
@@ -749,12 +843,16 @@ export default {
 
     // 3. Endpoint REST direct GET /cauta
     if (url.pathname === "/cauta") {
-      const res = await queryLegislatie({
-        act: url.searchParams.get("act") || "",
-        articole: url.searchParams.get("articole") || "",
-        cuvinte_cheie: url.searchParams.get("cuvinte_cheie") || ""
-      });
-      return new Response(JSON.stringify(res, null, 2), { headers: corsHeaders() });
+      const cc = { ctx, stats: [] };
+      const res = await queryLegislatie(
+        {
+          act: url.searchParams.get("act") || "",
+          articole: url.searchParams.get("articole") || "",
+          cuvinte_cheie: url.searchParams.get("cuvinte_cheie") || ""
+        },
+        cc
+      );
+      return new Response(JSON.stringify(res, null, 2), { headers: { ...corsHeaders(), "X-Legis-Cache": cc.stats.join(", ") } });
     }
 
     return new Response(
