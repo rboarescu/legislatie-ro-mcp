@@ -145,10 +145,11 @@ class LocalLegisCache:
         self.conn.row_factory = sqlite3.Row
         self._init_schema()
 
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def _init_schema(self) -> None:
-        # v2: notele sunt liste JSON si articolele au `source`; reconstruim tabela de articole o singura data
+        # v2: notele sunt liste JSON si articolele au `source`; v3: articolele > 999 ("Articolul 1.270")
+        # erau numerotate gresit. La schimbarea versiunii reconstruim tabela de articole o singura data.
         if self.conn.execute("PRAGMA user_version").fetchone()[0] < self.SCHEMA_VERSION:
             with self.conn:
                 self.conn.execute("DROP TABLE IF EXISTS articles")
@@ -327,7 +328,7 @@ class LocalLegisCache:
 # ============================================================================
 
 ARTICLE_HEADER_RE = re.compile(
-    r"(?:^|\n|\s{3,})(Articolul\s+([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)|Art\.\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+))\b[.\s:-]*"
+    r"(?:^|\n|\s{3,})(Articolul\s+((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+)|Art\.\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+))\b[.\s:-]*"
 )
 
 STRUCTURE_HEADER_RE = re.compile(
@@ -499,11 +500,11 @@ def parse_articles_from_consolidated_html(raw_html: str) -> list[dict[str, Any]]
             continue
         if art_depth >= 0 and len(stack) < art_depth:
             label = re.sub(r"\s+", " ", "".join(art_label)).strip()
-            num_m = re.search(r"(?i)^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b", label)
+            num_m = re.search(r"(?i)^(?:articolul|art\.?)\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+)\b", label)
             content, notes = _split_article_lines("".join(art_buf))
             articles.append(
                 {
-                    "art_num": num_m.group(1).lower() if num_m else str(len(articles) + 1),
+                    "art_num": num_m.group(1).lower().replace(".", "") if num_m else str(len(articles) + 1),
                     "art_label": label,
                     "section_path": art_section,
                     "content": content,
@@ -584,7 +585,7 @@ def parse_articles_from_text(raw_text: str) -> list[dict[str, str]]:
         if next_structs:
             chunk = text[start : next_structs[0]].strip()
 
-        art_num = (m.group(2) or m.group(3) or "").strip()
+        art_num = (m.group(2) or m.group(3) or "").strip().replace(".", "")
         art_label = m.group(1).strip()
         notes_found = NOTE_LINE_RE.findall(chunk)
 
@@ -889,6 +890,7 @@ def parse_article_numbers(articole_spec: str) -> list[str]:
         r"(?i)\b(?:alin(?:eatul)?|lit(?:era)?|pct|punctul|teza)\.?\s*\(?[0-9a-z^]+\)?", " ", articole_spec
     )
     cleaned = re.sub(r"(?i)\b(articolul|articolele|art\.?)", " ", cleaned)
+    cleaned = re.sub(r"(\d)\.(\d{3})\b", r"\1\2", cleaned)  # "1.270" -> "1270"
     result: list[str] = []
     for part in re.split(r"[,;]+|\s+[sș]i\s+", cleaned):
         part = part.strip()
@@ -1072,7 +1074,7 @@ class LegislatieMCPTools:
                 "emitent": "Parlamentul / Guvernul României",
                 "publicatie": "Monitorul Oficial",
                 "link_html": link,
-                "text": "CONSOLIDATED_LINK",
+                "text": "",
             }
             self.cache.save_act_and_articles(synthetic)
             return [synthetic]
@@ -1220,16 +1222,17 @@ class LegislatieMCPTools:
         result["disclaimer"] = DISCLAIMER_LEGAL
         return result
 
-    def _ensure_consolidated_articles(self, act_meta: dict[str, Any]) -> None:
+    def _ensure_consolidated_articles(self, act_meta: dict[str, Any]) -> str | None:
         """
         Daca actul are un `link_html` oficial (ex: http://legislatie.just.ro/Public/DetaliiDocument/29779),
         preia o singura data pagina consolidata la zi si inlocuieste articolele din SQLite cu forma
         consolidata la zi (care include toate modificarile recente + notele .S_NTA/.S_PAR cu RIL/HP/CCR).
+        Intoarce un avertisment pentru model cand forma consolidata nu a putut fi preluata.
         """
         act_key = act_meta.get("act_key") or ""
         link = (act_meta.get("link_html") or "").strip()
         if not act_key or not link:
-            return
+            return None
 
         cur = self.cache.conn.execute(
             "SELECT COUNT(*) AS cnt FROM articles WHERE act_key = ? AND source = 'consolidated'",
@@ -1237,7 +1240,7 @@ class LegislatieMCPTools:
         )
         row = cur.fetchone()
         if row and row["cnt"] > 0:
-            return
+            return None
 
         def fetch_html(url: str) -> str:
             self.client._throttle()
@@ -1245,7 +1248,7 @@ class LegislatieMCPTools:
                 re.sub(r"^http://", "https://", url),
                 headers={"User-Agent": "legislatie-ro-mcp/1.0 (Consolidated View Reader)"},
             )
-            with urllib.request.urlopen(req, timeout=20.0) as resp:
+            with urllib.request.urlopen(req, timeout=45.0) as resp:
                 return resp.read().decode("utf-8", errors="replace")
 
         try:
@@ -1280,8 +1283,14 @@ class LegislatieMCPTools:
                             for idx, a in enumerate(consolidated_arts)
                         ],
                     )
-        except Exception:
-            pass
+            else:
+                return "Pagina consolidata nu contine articole; textul de mai jos (daca exista) provine din API-ul SOAP si poate sa nu fie la zi."
+        except Exception as exc:
+            return (
+                f"Forma consolidata la zi nu a putut fi preluata ({exc.__class__.__name__}: {exc}). "
+                "Textul de mai jos (daca exista) provine din API-ul SOAP si poate sa nu fie la zi; reincearca mai tarziu."
+            )
+        return None
 
     def extrage_articole_din_act(
         self,
@@ -1308,7 +1317,7 @@ class LegislatieMCPTools:
 
         # Alegem actul principal (cel cu textul cel mai complet, evitand actele scurte de modificare daca se cauta legea de baza)
         best = max(results, key=lambda x: len(x.get("text") or ""))
-        self._ensure_consolidated_articles(best)
+        avertisment = self._ensure_consolidated_articles(best)
         act_key = best["act_key"]
         all_rows = self._act_rows(act_key)
 
@@ -1340,12 +1349,23 @@ class LegislatieMCPTools:
         # cautam direct in API cu SearchText="Articolul X" sau numarul articolului
         if not extracted and req_nums:
             parsed_id = parse_act_identifier(act)
-            fallback_res = self.client.search(
-                search_an=an or parsed_id["an"],
-                search_numar=numar or parsed_id["numar"],
-                search_text=f"Articolul {req_nums[0]}",
-                rezultate_pagina=5,
-            )
+            want_num, want_an = numar or parsed_id["numar"], an or parsed_id["an"]
+            want_tip = strip_diacritics_lower(parsed_id.get("tip_act", ""))
+            # API-ul ignora anul cand se cauta si dupa text: pastram doar acelasi numar, an (din titlu) si tip
+            fallback_res = [
+                r
+                for r in self.client.search(
+                    search_an=want_an,
+                    search_numar=want_num,
+                    search_text=f"Articolul {req_nums[0]}",
+                    rezultate_pagina=5,
+                )
+                if r.get("numar") == want_num
+                and want_an
+                and want_an in (r.get("titlu") or "")
+                and (not want_tip or strip_diacritics_lower(r.get("tip_act", "")) == want_tip)
+                and r.get("act_key") != act_key
+            ]
             if fallback_res:
                 best = max(fallback_res, key=lambda x: len(x.get("text") or ""))
                 act_key = best["act_key"]
@@ -1387,6 +1407,8 @@ class LegislatieMCPTools:
         # Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
         if 0 < len(all_rows) <= 80:
             result["cuprins_articole"] = [article_summary(r) for r in all_rows]
+        if avertisment:
+            result["avertisment"] = avertisment
         result["instructiuni_model"] = INSTRUCTIUNI_MODEL
         result["disclaimer"] = DISCLAIMER_LEGAL
         return result
@@ -1423,8 +1445,10 @@ class LegislatieMCPTools:
         # Cu act precizat cautam in forma lui consolidata; fara act, in primele acte gasite de API dupa text
         acts = [max(results, key=lambda x: len(x.get("text") or ""))] if act_given else results[:3]
         entries: list[tuple[dict[str, Any], sqlite3.Row]] = []
+        avertismente = []
         for act_meta in acts:
-            self._ensure_consolidated_articles(act_meta)
+            if warn := self._ensure_consolidated_articles(act_meta):
+                avertismente.append(f"{act_meta.get('titlu', '')[:80]}: {warn}")
             entries.extend((act_meta, row) for row in self._act_rows(act_meta["act_key"]))
 
         stems, ranked = rank_articles(
@@ -1460,6 +1484,8 @@ class LegislatieMCPTools:
             )
         if act_given and 0 < len(entries) <= 80:
             result["cuprins_articole"] = [article_summary(row) for _, row in entries]
+        if avertismente:
+            result["avertisment"] = " | ".join(avertismente)
         result["instructiuni_model"] = INSTRUCTIUNI_MODEL
         result["disclaimer"] = DISCLAIMER_LEGAL
         return result
@@ -1485,7 +1511,7 @@ class LegislatieMCPTools:
                 "disclaimer": DISCLAIMER_LEGAL,
             }
         best = max(results, key=lambda x: len(x.get("text") or ""))
-        self._ensure_consolidated_articles(best)
+        avertisment = self._ensure_consolidated_articles(best)
 
         # Cuprinsul din forma consolidata: articolele consecutive din aceeasi sectiune formeaza o intrare
         outline: list[dict[str, str]] = []
@@ -1522,6 +1548,7 @@ class LegislatieMCPTools:
             },
             "numar_sectiuni": len(outline),
             "cuprins": outline[:120],
+            **({"avertisment": avertisment} if avertisment else {}),
             "disclaimer": DISCLAIMER_LEGAL,
         }
 

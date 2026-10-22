@@ -83,7 +83,7 @@ let cachedTokenTs = 0;
 // Cheile includ PARSER_VERSION, deci o versiune noua a parserului invalideaza automat cache-ul.
 // ============================================================================
 
-const PARSER_VERSION = "2026-10-22.1";
+const PARSER_VERSION = "2026-10-22.2";
 const DOC_TTL_SEC = 24 * 3600;
 const SEARCH_TTL_SEC = 12 * 3600;
 const MEMORY_TTL_MS = 6 * 3600 * 1000;
@@ -363,10 +363,11 @@ function parseArticlesFromConsolidatedHtml(rawHtml) {
     if (hiddenDepth || artDepth < 0) continue;
     if (stack.length < artDepth) {
       const lbl = label.join("").replace(/\s+/g, " ").trim();
-      const numM = lbl.match(/^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b/i);
+      // Articolele de peste 999 apar ca "Articolul 1.270" (separator de mii)
+      const numM = lbl.match(/^(?:articolul|art\.?)\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+)\b/i);
       const { content, notes } = splitArticleLines(buf.join(""));
       articles.push({
-        num: numM ? numM[1].toLowerCase() : String(articles.length + 1),
+        num: numM ? numM[1].toLowerCase().replace(/\./g, "") : String(articles.length + 1),
         label: lbl,
         content,
         notes: notes.length ? notes : null
@@ -381,14 +382,14 @@ function parseArticlesFromConsolidatedHtml(rawHtml) {
 }
 
 function splitArticlesPlain(text) {
-  const re = /(?:^|\n)(Articolul\s+([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)|Art\.\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+))\b[.\s:-]*/gi;
+  const re = /(?:^|\n)(Articolul\s+((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+)|Art\.\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+))\b[.\s:-]*/gi;
   const matches = [];
   let m;
   while ((m = re.exec(text)) !== null) {
     matches.push({
       idx: m.index + (text[m.index] === "\n" ? 1 : 0),
       label: m[1].trim(),
-      num: (m[2] || m[3] || "").toLowerCase()
+      num: (m[2] || m[3] || "").toLowerCase().replace(/\./g, "")
     });
   }
   if (!matches.length) return [{ num: "integral", label: "Text", content: text.slice(0, 6000), notes: null }];
@@ -540,7 +541,8 @@ function articleSummary(a) {
 function parseRequestedArticles(articole) {
   const cleaned = stripDiacriticsLower(articole)
     .replace(/\b(?:alin(?:eatul)?|lit(?:era)?|pct|punctul|teza)\.?\s*\(?[0-9a-z^]+\)?/g, " ")
-    .replace(/\b(?:articolele|articolul|art)\.?/g, " ");
+    .replace(/\b(?:articolele|articolul|art)\.?/g, " ")
+    .replace(/(\d)\.(\d{3})\b/g, "$1$2"); // "1.270" -> "1270"
   const out = [];
   for (const part of cleaned.split(/[,;]+|\s+si\s+/)) {
     const range = part.trim().match(/^(\d+)\s*[-–]\s*(\d+)$/);
@@ -582,9 +584,19 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
   const resolved = resolveAct(act);
   let best = null;
   let allArts = [];
+  let avertisment = null;
 
   if (resolved.doc_id) {
-    const { arts, link } = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`, cc);
+    let fetched;
+    try {
+      fetched = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`, cc);
+    } catch (err) {
+      return {
+        eroare: `Forma consolidata la zi nu a putut fi preluata de pe legislatie.just.ro (${err}). Reincearca mai tarziu; nu raspunde din memorie.`,
+        disclaimer: DISCLAIMER_LEGAL
+      };
+    }
+    const { arts, link } = fetched;
     allArts = arts;
     best = {
       tip_act: resolved.tip_act || "ACT NORMATIV",
@@ -658,9 +670,12 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
         const { arts, link } = await fetchConsolidatedArticles(best.link_oficial, cc);
         allArts = arts;
         if (arts.length) best = { ...best, link_oficial: link };
-      } catch (_) {}
+      } catch (err) {
+        avertisment = `Forma consolidata nu a putut fi preluata (${err}).`;
+      }
     }
     if (!allArts.length) {
+      avertisment = `${avertisment || "Pagina consolidata nu contine articole."} Textul provine din API-ul SOAP si poate sa nu fie la zi.`;
       allArts = splitArticlesPlain(best.text);
     }
   }
@@ -705,6 +720,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
     articole_extrase: selected,
     // Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
     ...(allArts.length <= 80 ? { cuprins_articole: allArts.map(articleSummary) } : {}),
+    ...(avertisment ? { avertisment } : {}),
     instructiuni_model: INSTRUCTIUNI_MODEL,
     disclaimer: DISCLAIMER_LEGAL
   };
