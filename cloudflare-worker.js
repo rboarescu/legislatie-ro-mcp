@@ -509,27 +509,90 @@ function searchStems(query) {
   return [...new Set(tokens.map(stemRo))];
 }
 
-// Clasament pe articole: fiecare radacina gasita la inceput de cuvant valoreaza mai mult cu cat e mai rara in act (IDF)
+// Clasament BM25 pe articole (radacini gasite la inceput de cuvant), normalizat dupa lungime, ca un articol scurt
+// care contine toti termenii sa nu fie depasit de articole lungi care ii pomenesc des; plus un bonus pentru cea mai
+// buna linie (alineat) in care termenii apar impreuna, ex: "Locuintele sociale apartin domeniului public",
+// si unul pentru termenii din denumirea marginala a articolului.
+const BM25_K1 = 1.2;
+const BM25_B = 0.75;
+
 function rankArticles(arts, query) {
   const stems = searchStems(query);
   if (!stems.length) return { stems, ranked: [] };
   const docs = arts.map((a) => stripDiacriticsLower(`${a.content}\n${(a.notes || []).join("\n")}`));
-  const res = stems.map((s) => new RegExp(`\\b${s}`, "g"));
-  const df = res.map((re) => docs.filter((d) => d.search(re) >= 0).length);
+  const lens = docs.map((d) => (d.match(/[a-z0-9]+/g) || []).length);
+  const avgLen = lens.reduce((x, y) => x + y, 0) / Math.max(1, docs.length);
+  const globalRes = stems.map((st) => new RegExp(`\\b${st}`, "g"));
+  const lineRes = stems.map((st) => new RegExp(`\\b${st}`));
+  const tfs = docs.map((d) => globalRes.map((re) => (d.match(re) || []).length));
+  const idf = stems.map((_, k) => {
+    const df = tfs.filter((t) => t[k] > 0).length;
+    return Math.log(1 + (docs.length - df + 0.5) / (df + 0.5));
+  });
   const ranked = [];
   docs.forEach((d, i) => {
+    const present = stems.map((_, k) => tfs[i][k] > 0);
+    if (!present.some(Boolean)) return;
     let score = 0;
-    const found = [];
-    res.forEach((re, k) => {
-      const hits = (d.match(re) || []).length;
-      if (!hits) return;
-      found.push(stems[k]);
-      score += Math.log(1 + arts.length / df[k]) * (1 + Math.log(hits));
+    stems.forEach((_, k) => {
+      const tf = tfs[i][k];
+      if (tf) score += (idf[k] * tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * lens[i]) / avgLen));
     });
-    if (found.length) ranked.push({ idx: i, score, found });
+    let bestLine = 0;
+    for (const line of d.split("\n")) {
+      let lineScore = 0;
+      lineRes.forEach((re, k) => {
+        if (present[k] && re.test(line)) lineScore += idf[k];
+      });
+      if (lineScore > bestLine) bestLine = lineScore;
+    }
+    // Denumirea marginala (a doua linie a articolului, cand nu incepe cu un alineat) descrie subiectul articolului
+    const title = arts[i].content.split("\n")[1] || "";
+    let titleScore = 0;
+    if (title && !title.startsWith("(")) {
+      const t = stripDiacriticsLower(title);
+      lineRes.forEach((re, k) => {
+        if (re.test(t)) titleScore += idf[k];
+      });
+    }
+    // Articolele abrogate apar doar prin notele lor de modificare; le coboram in clasament
+    const body = arts[i].content.split("\n").slice(1).join(" ").trim();
+    const factor = /^abrogat[aă]?\.?$/i.test(body) ? 0.3 : 1;
+    ranked.push({ idx: i, score: (score + bestLine + titleScore) * factor, found: stems.filter((_, k) => present[k]) });
   });
   ranked.sort((a, b) => b.score - a.score || a.idx - b.idx);
   return { stems, ranked };
+}
+
+// Articolele lungi se returneaza ca fragment: titlul + liniile (alineatele) care contin termenii cautati, in ordinea
+// din text, cu "[…]" intre ele; restul se obtine cerand articolul cu `articole`.
+const EXCERPT_MAX_CHARS = 2500;
+
+function articleExcerpt(content, stems) {
+  if (content.length <= EXCERPT_MAX_CHARS) return { text: content, fragment: false };
+  const lines = content.split("\n");
+  const headLen = lines[1] && !lines[1].startsWith("(") ? 2 : 1;
+  const res = stems.map((st) => new RegExp(`\\b${st}`));
+  const scored = lines
+    .map((l, i) => ({ i, n: res.filter((re) => re.test(stripDiacriticsLower(l))).length }))
+    .filter((x) => x.i >= headLen && x.n > 0)
+    .sort((a, b) => b.n - a.n || a.i - b.i);
+  const keep = [];
+  let size = lines.slice(0, headLen).join("\n").length;
+  for (const x of scored) {
+    if (keep.length && size + lines[x.i].length > EXCERPT_MAX_CHARS) break;
+    keep.push(x.i);
+    size += lines[x.i].length;
+  }
+  const out = lines.slice(0, headLen);
+  let prev = headLen - 1;
+  for (const i of keep.sort((a, b) => a - b)) {
+    if (i > prev + 1) out.push("[…]");
+    out.push(lines[i].length > 1500 ? lines[i].slice(0, 1500) + "…" : lines[i]);
+    prev = i;
+  }
+  if (prev < lines.length - 1) out.push("[…]");
+  return { text: out.join("\n"), fragment: true };
 }
 
 function articleSummary(a) {
@@ -560,7 +623,8 @@ const INSTRUCTIUNI_MODEL =
   "Citeaza si rezuma DOAR din textul din `articole_extrase`. Daca informatia ceruta (termene, documente, institutii) " +
   "nu apare in acest text, spune explicit ca nu ai gasit-o in act si NU o completa din memorie. Pentru alte articole " +
   "reapeleaza unealta cu `articole` (vezi `cuprins_articole`) sau cu alti termeni, in limbajul legii " +
-  "(ex: 'aeronave fara pilot' in loc de 'drone').";
+  "(ex: 'aeronave fara pilot' in loc de 'drone'). Articolele marcate `fragment` contin doar alineatele relevante; " +
+  "cere articolul cu `articole` pentru textul complet.";
 
 // Unele acte (ex: legile de aprobare/republicare a Codurilor) au in forma consolidata doar o trimitere (.S_REF)
 // catre documentul cu textul propriu-zis; urmam o singura trimitere cand pagina nu are articole.
@@ -652,6 +716,30 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
           disclaimer: DISCLAIMER_LEGAL
         };
       }
+    } else if (!act && cuvinte_cheie) {
+      // SearchText cauta fraza exacta (fara diacritice); incercam fraza intreaga, apoi perechi de cuvinte consecutive
+      const words = cuvinte_cheie.split(/\s+/).filter((t) => t.length >= 3 && !STOPWORDS.has(stripDiacriticsLower(t)));
+      const tries = [cuvinte_cheie.trim(), ...words.slice(0, 4).map((w, i) => (words[i + 1] ? `${w} ${words[i + 1]}` : "")).filter(Boolean)];
+      for (const text of [...new Set(tries)]) {
+        items = await soapSearch({ text }, cc);
+        if (items.length) break;
+      }
+      if (items.length > 1) {
+        return {
+          ambiguu: true,
+          mesaj:
+            "Fara `act`, cautarea se face dupa fraza exacta in toata legislatia si a gasit mai multe acte (vezi candidati). " +
+            "Alege actul potrivit (pentru intrebari uzuale vezi si referintele din skill) si reapeleaza cu `act` si `cuvinte_cheie`; " +
+            "daca niciun candidat nu se potriveste, numeste direct legea de baza a domeniului.",
+          candidati: items.slice(0, 10).map((x) => ({
+            act: `${x.tip_act} nr. ${x.numar}`,
+            data: x.data_vigoare,
+            titlu: x.titlu.slice(0, 200),
+            link_oficial: x.link_oficial
+          })),
+          disclaimer: DISCLAIMER_LEGAL
+        };
+      }
     } else {
       items = filterItems(
         await soapSearch({
@@ -695,7 +783,11 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
     if (missing.length) cautare = { articole_negasite: missing };
   } else if (cuvinte_cheie) {
     const { stems, ranked } = rankArticles(allArts, cuvinte_cheie);
-    selected = ranked.slice(0, 5).map((r) => allArts[r.idx]);
+    selected = ranked.slice(0, 6).map((r) => {
+      const a = allArts[r.idx];
+      const ex = articleExcerpt(a.content, stems);
+      return ex.fragment ? { ...a, content: ex.text, fragment: true, lungime_text_complet: a.content.length } : a;
+    });
     cautare = {
       termeni_cautati: stems,
       articole_potrivite: ranked.length,
@@ -720,7 +812,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
     ...(cautare ? { cautare } : {}),
     articole_extrase: selected,
     // Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
-    ...(allArts.length <= 80 ? { cuprins_articole: allArts.map(articleSummary) } : {}),
+    ...(allArts.length <= 120 ? { cuprins_articole: allArts.map(articleSummary) } : {}),
     ...(avertisment ? { avertisment } : {}),
     instructiuni_model: INSTRUCTIUNI_MODEL,
     disclaimer: DISCLAIMER_LEGAL

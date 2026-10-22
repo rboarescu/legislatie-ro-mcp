@@ -10,3 +10,6 @@ venv/
 build/
 *.egg-info/
 .pytest_cache/
+
+# Conversatii de test personale (nu se publica)
+test_convos/

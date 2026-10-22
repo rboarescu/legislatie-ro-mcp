@@ -932,37 +932,100 @@ def search_stems(query: str) -> list[str]:
     return list(dict.fromkeys(stem_ro(t) for t in tokens))
 
 
+BM25_K1 = 1.2
+BM25_B = 0.75
+
+
 def rank_articles(texts: list[str], query: str) -> tuple[list[str], list[tuple[int, float, list[str]]]]:
     """
-    Clasament pe articole: fiecare radacina gasita la inceput de cuvant valoreaza mai mult cu cat e mai rara in act (IDF).
-    Intoarce (radacini, [(index, scor, radacini_gasite)]) sortat descrescator dupa scor.
+    Clasament BM25 pe articole (radacini gasite la inceput de cuvant), normalizat dupa lungime, ca un articol scurt
+    care contine toti termenii sa nu fie depasit de articole lungi care ii pomenesc des; plus un bonus pentru cea mai
+    buna linie (alineat) in care termenii apar impreuna, ex: "Locuintele sociale apartin domeniului public",
+    si unul pentru termenii din denumirea marginala (a doua linie, cand nu incepe cu un alineat).
+    Identic cu rankArticles din cloudflare-worker.js. Intoarce (radacini, [(index, scor, radacini_gasite)]).
     """
     stems = search_stems(query)
     if not stems:
         return stems, []
     docs = [strip_diacritics_lower(t) for t in texts]
-    patterns = [re.compile(rf"\b{re.escape(s)}") for s in stems]
-    df = [sum(1 for d in docs if p.search(d)) for p in patterns]
+    lens = [len(re.findall(r"[a-z0-9]+", d)) for d in docs]
+    avg_len = sum(lens) / max(1, len(docs))
+    patterns = [re.compile(rf"\b{re.escape(st)}") for st in stems]
+    tfs = [[len(p.findall(d)) for p in patterns] for d in docs]
+    idf = []
+    for k in range(len(stems)):
+        df = sum(1 for t in tfs if t[k] > 0)
+        idf.append(math.log(1 + (len(docs) - df + 0.5) / (df + 0.5)))
     ranked: list[tuple[int, float, list[str]]] = []
     for i, d in enumerate(docs):
+        present = [tf > 0 for tf in tfs[i]]
+        if not any(present):
+            continue
         score = 0.0
-        found: list[str] = []
-        for k, p in enumerate(patterns):
-            hits = len(p.findall(d))
-            if hits:
-                found.append(stems[k])
-                score += math.log(1 + len(docs) / df[k]) * (1 + math.log(hits))
-        if found:
-            ranked.append((i, score, found))
+        for k, tf in enumerate(tfs[i]):
+            if tf:
+                score += idf[k] * tf * (BM25_K1 + 1) / (tf + BM25_K1 * (1 - BM25_B + BM25_B * lens[i] / avg_len))
+        best_line = 0.0
+        for line in d.split("\n"):
+            line_score = sum(idf[k] for k, p in enumerate(patterns) if present[k] and p.search(line))
+            best_line = max(best_line, line_score)
+        lines = texts[i].split("\n")
+        title = lines[1] if len(lines) > 1 else ""
+        title_score = 0.0
+        if title and not title.startswith("("):
+            t = strip_diacritics_lower(title)
+            title_score = sum(idf[k] for k, p in enumerate(patterns) if p.search(t))
+        # Articolele abrogate apar doar prin notele lor de modificare; le coboram in clasament
+        body = " ".join(lines[1:]).strip()
+        factor = 0.3 if re.match(r"(?i)^abrogat[aă]?\.?$", body) else 1.0
+        ranked.append((i, (score + best_line + title_score) * factor, [stems[k] for k in range(len(stems)) if present[k]]))
     ranked.sort(key=lambda r: (-r[1], r[0]))
     return stems, ranked
+
+
+EXCERPT_MAX_CHARS = 2500
+
+
+def article_excerpt(content: str, stems: list[str]) -> tuple[str, bool]:
+    """
+    Articolele lungi devin fragment: titlul + liniile (alineatele) care contin termenii cautati, in ordinea din text,
+    cu "[…]" intre ele. Intoarce (text, este_fragment). Identic cu articleExcerpt din cloudflare-worker.js.
+    """
+    if len(content) <= EXCERPT_MAX_CHARS:
+        return content, False
+    lines = content.split("\n")
+    head_len = 2 if len(lines) > 1 and lines[1] and not lines[1].startswith("(") else 1
+    patterns = [re.compile(rf"\b{re.escape(st)}") for st in stems]
+    scored = [
+        (i, sum(1 for p in patterns if p.search(strip_diacritics_lower(line))))
+        for i, line in enumerate(lines)
+    ]
+    scored = sorted((x for x in scored if x[0] >= head_len and x[1] > 0), key=lambda x: (-x[1], x[0]))
+    keep: list[int] = []
+    size = len("\n".join(lines[:head_len]))
+    for i, _n in scored:
+        if keep and size + len(lines[i]) > EXCERPT_MAX_CHARS:
+            break
+        keep.append(i)
+        size += len(lines[i])
+    out = lines[:head_len]
+    prev = head_len - 1
+    for i in sorted(keep):
+        if i > prev + 1:
+            out.append("[…]")
+        out.append(lines[i][:1500] + "…" if len(lines[i]) > 1500 else lines[i])
+        prev = i
+    if prev < len(lines) - 1:
+        out.append("[…]")
+    return "\n".join(out), True
 
 
 INSTRUCTIUNI_MODEL = (
     "Citeaza si rezuma DOAR din textul articolelor returnate. Daca informatia ceruta (termene, documente, institutii) "
     "nu apare in acest text, spune explicit ca nu ai gasit-o in act si NU o completa din memorie. Pentru alte articole "
     "reapeleaza `extrage_articole_din_act` (vezi `cuprins_articole` sau `exploreaza_cuprinsul_actului`) ori cauta cu alti "
-    "termeni, in limbajul legii (ex: 'aeronave fara pilot' in loc de 'drone')."
+    "termeni, in limbajul legii (ex: 'aeronave fara pilot' in loc de 'drone'). Rezultatele marcate `fragment` contin doar "
+    "alineatele relevante; cere articolul cu `extrage_articole_din_act` pentru textul complet."
 )
 
 
@@ -1406,7 +1469,7 @@ class LegislatieMCPTools:
             result["articole_negasite"] = missing
         result["articole_extrase"] = extracted
         # Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
-        if 0 < len(all_rows) <= 80:
+        if 0 < len(all_rows) <= 120:
             result["cuprins_articole"] = [article_summary(r) for r in all_rows]
         if avertisment:
             result["avertisment"] = avertisment
@@ -1427,14 +1490,24 @@ class LegislatieMCPTools:
         (sau in toata legislatia daca actul nu este specificat) si returneaza articolele exacte.
         """
         act_given = bool(act or numar)
+        # Fara act, API-ul cauta fraza exacta (fara diacritice): incercam fraza intreaga, apoi perechi de cuvinte consecutive
+        if act_given:
+            phrases = [""]
+        else:
+            words = [w for w in cuvinte_cheie.split() if len(w) >= 3 and strip_diacritics_lower(w) not in SEARCH_STOPWORDS]
+            phrases = list(dict.fromkeys([cuvinte_cheie.strip()] + [f"{a} {b}" for a, b in zip(words[:4], words[1:5])]))
+        results: list[dict[str, Any]] = []
         try:
-            results = self._find_best_act(
-                act=act,
-                numar=numar,
-                an=an,
-                cuvinte_cheie_text="" if act_given else cuvinte_cheie,
-                indiciu=cuvinte_cheie,
-            )
+            for phrase in phrases:
+                results = self._find_best_act(
+                    act=act,
+                    numar=numar,
+                    an=an,
+                    cuvinte_cheie_text=phrase,
+                    indiciu=cuvinte_cheie,
+                )
+                if results:
+                    break
         except ActAmbiguu as amb:
             return amb.response
         if not results:
@@ -1459,6 +1532,7 @@ class LegislatieMCPTools:
         fragmente: list[dict[str, Any]] = []
         for idx, _score, found in ranked[: max(1, min(limita_articole, 15))]:
             act_meta, row = entries[idx]
+            excerpt, is_fragment = article_excerpt(row["content"], stems)
             fragmente.append(
                 {
                     "act": f"{act_meta.get('tip_act')} nr. {act_meta.get('numar')} ({act_meta.get('data_vigoare')})",
@@ -1467,7 +1541,8 @@ class LegislatieMCPTools:
                     "articol": row["art_label"],
                     "sectiune_capitol": row["section_path"],
                     "termeni_gasiti": found,
-                    "text_oficial": row["content"][:4000],
+                    "text_oficial": excerpt,
+                    **({"fragment": True, "lungime_text_complet": len(row["content"])} if is_fragment else {}),
                     "note_modificari_ril_ccr": decode_notes(row["notes"]),
                 }
             )
@@ -1483,7 +1558,7 @@ class LegislatieMCPTools:
                 f"Niciun articol nu contine termenii [{', '.join(stems)}]. Incearca termenii folositi de lege"
                 + (" sau alege din cuprins_articole." if act_given else ".")
             )
-        if act_given and 0 < len(entries) <= 80:
+        if act_given and 0 < len(entries) <= 120:
             result["cuprins_articole"] = [article_summary(row) for _, row in entries]
         if avertismente:
             result["avertisment"] = " | ".join(avertismente)

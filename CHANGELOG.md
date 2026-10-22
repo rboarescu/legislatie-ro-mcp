@@ -27,6 +27,12 @@
 - Eșecul descărcării formei consolidate era ignorat, iar căutarea de rezervă „Articolul X” putea întoarce articolul unui alt act (API-ul ignoră anul când se caută și text). Acum se acceptă doar același număr, an și tip, iar eșecurile apar în `avertisment`.
 - Alias nou cu `doc_id` pentru Codul amenajării teritoriului, urbanismului și construcțiilor (Legea 169/2026, document 314302).
 
+### Clasament mai bun (test „locuința socială”, Worker + `server.py`)
+- Articolul care răspundea exact (Legea 114/1996 art. 39, un rând) ieșea pe locul 7, după articole lungi care pomeneau des termenii; modelul nu l-a văzut și a inventat un „art. 38”.
+- Clasament BM25 normalizat după lungime + bonus pentru termenii care apar împreună în același alineat și pentru denumirea marginală; articolele abrogate coboară. 12/12 cazuri de test (față de 8/12), identic în Python și JS.
+- Articolele lungi se întorc ca fragment (titlu + alineatele relevante, `fragment: true`); 6 rezultate în loc de 5; harta actului (`cuprins_articole`) pentru acte de până la 120 de articole.
+- Căutarea fără act: fraza exactă, apoi fraze mai scurte; mai multe acte găsite → listă de candidați în loc de ghicit.
+
 ### Skill (`skills/`)
 - `SKILL.md`: ambele variante de conector (local și remote), cum se interpretează `ambiguu`, lipsa potrivirilor, `cuprins_articole`, `articole_negasite`, `avertisment`; verificarea fiecărei afirmații concrete în textul returnat.
 - `references/DOMENII_SI_LEGI.md`: toate articolele citate au fost verificate pe textul consolidat; corectate trimiterile greșite (Cod adm. art. 356 → 358/360, art. 109 eliminat, art. 536 reformulat; Legea 119/1996 art. 41 → 43 lit. i); OUG 84/2001 → OG 84/2001; Legea dialogului social art. 211 inexistent → Codul muncii art. 269; Legea 554/2004 art. 11 alin. (2) curge de la comunicare, nu de la emitere) și adăugat un vocabular „limbaj uzual → termenii legii” pentru căutări.

@@ -61,9 +61,10 @@ Execută căutări succesive până ai textul exact al articolelor incidente:
 #### Cum interpretezi răspunsul uneltei
 | Primești în răspuns | Ce faci |
 | :--- | :--- |
-| `ambiguu: true` (+ eventual `candidati`) | Numărul actului există în mai mulți ani. Alege din `candidati` doar dacă titlul se potrivește clar cu întrebarea; altfel **întreabă utilizatorul anul**. Nu descrie conținutul vreunui act până nu l-ai extras. |
+| `ambiguu: true` (+ eventual `candidati`) | Numărul actului există în mai mulți ani sau, fără `act`, fraza a fost găsită în mai multe acte. Fără `act`, căutarea e după fraza exactă, deci e mai sigur să numești direct legea de bază a domeniului. Alege din `candidati` doar dacă titlul se potrivește clar cu întrebarea; altfel **întreabă utilizatorul anul**. Nu descrie conținutul vreunui act până nu l-ai extras. |
 | `mesaj`: niciun articol nu conține termenii | Legea folosește alte cuvinte. Reformulează în limbajul legii (vezi secțiunea 6 din `references/DOMENII_SI_LEGI.md`, ex: „drone” → „aeronave fără pilot”) sau alege articolele din `cuprins_articole`. |
-| `cuprins_articole` | Harta actului (articol + primul rând). Folosește-o pentru apeluri țintite cu `articole`, mai ales când întrebarea e despre un detaliu (termen, durată, document). |
+| `cuprins_articole` | Harta actului (articol + primul rând), pentru acte de până la 120 de articole. Folosește-o pentru apeluri țintite cu `articole`, mai ales când întrebarea e despre un detaliu (termen, durată, document). |
+| `fragment: true` | Articolul e lung și ai primit doar titlul și alineatele care conțin termenii căutați (`[…]` marchează părțile omise). Înainte să tragi o concluzie din restul articolului, cere-l întreg cu `articole`. |
 | `articole_negasite` | Articolul nu există în forma la zi (abrogat, renumerotat sau număr greșit). Spune asta; nu reconstrui textul din memorie. |
 | `avertisment` | Forma consolidată nu a putut fi preluată sau textul vine din altă sursă. Spune-i utilizatorului că textul poate să nu fie la zi și dă-i linkul oficial. |
 | `note_modificari_ril_ccr` / `notes` | Istoricul modificărilor și deciziile CCR / RIL / HP legate de articol. Menționează-le când schimbă interpretarea. |

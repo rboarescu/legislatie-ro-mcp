@@ -62,6 +62,8 @@ Căutarea în act găsește doar cuvintele care apar efectiv în lege. Dacă o c
 | amendă | sancțiune contravențională, amendă contravențională |
 | primărie (ca autoritate) | unitatea administrativ-teritorială, primarul, consiliul local |
 | dat afară | concediere, încetarea contractului individual de muncă |
+| a contesta concedierea / o sancțiune în instanță | cereri, conflict de muncă, termen (Codul muncii `art. 268`) |
+| locuință socială „a cui e” | locuințele sociale aparțin domeniului public (Legea 114/1996 `art. 39`) |
 | a-mi da demisia | demisie, termen de preaviz |
 | chirie, chiriaș | locațiune, locatar, contract de închiriere |
 | a contesta în instanță un act al primăriei | plângere prealabilă, acțiune în contencios administrativ |
