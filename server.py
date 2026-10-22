@@ -67,33 +67,48 @@ DISCLAIMER_LEGAL = (
 
 # Aliasuri uzuale pentru ca omul de rand sau LLM-ul sa poata scrie direct "Codul Muncii", "Codul Administrativ" etc.
 ALIASURI_ACTE: dict[str, dict[str, str]] = {
-    "codul administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ"},
-    "cod administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ"},
-    "codul muncii": {"numar": "53", "an": "2003", "titlu": "Codul muncii"},
-    "codul civil": {"numar": "287", "an": "2009", "titlu": "Codul civil"},
-    "codul de procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedura civila"},
-    "cod procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedura civila"},
-    "codul penal": {"numar": "286", "an": "2009", "titlu": "Codul penal"},
-    "codul de procedura penala": {"numar": "135", "an": "2010", "titlu": "Codul de procedura penala"},
-    "codul fiscal": {"numar": "227", "an": "2015", "titlu": "Codul fiscal"},
-    "codul de procedura fiscala": {"numar": "207", "an": "2015", "titlu": "Codul de procedura fiscala"},
-    "codul rutier": {"numar": "195", "an": "2002", "titlu": "circulatia pe drumurile publice"},
+    "codul administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
+    "oug 57/2019": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
+    "cod administrativ": {"numar": "57", "an": "2019", "titlu": "Codul administrativ", "doc_id": "215925"},
+    "codul muncii": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "41625"},
+    "legea 53/2003": {"numar": "53", "an": "2003", "titlu": "Codul muncii", "doc_id": "41625"},
+    "codul civil": {"numar": "287", "an": "2009", "titlu": "Codul civil", "doc_id": "109884"},
+    "codul de procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "120611"},
+    "cod procedura civila": {"numar": "134", "an": "2010", "titlu": "Codul de procedură civilă", "doc_id": "120611"},
+    "codul penal": {"numar": "286", "an": "2009", "titlu": "Codul penal", "doc_id": "109855"},
+    "codul de procedura penala": {"numar": "135", "an": "2010", "titlu": "Codul de procedură penală", "doc_id": "120612"},
+    "codul fiscal": {"numar": "227", "an": "2015", "titlu": "Codul fiscal", "doc_id": "171282"},
+    "codul de procedura fiscala": {"numar": "207", "an": "2015", "titlu": "Codul de procedură fiscală", "doc_id": "170011"},
+    "codul rutier": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41023"},
+    "oug 195/2002": {"numar": "195", "an": "2002", "titlu": "circulația pe drumurile publice", "doc_id": "41023"},
     "codul silvic": {"numar": "331", "an": "2024", "titlu": "Codul silvic"},
-    "codul urbanismului": {"numar": "169", "an": "2026", "titlu": "amenajarii teritoriului, urbanismului si constructiilor"},
-    "catuc": {"numar": "169", "an": "2026", "titlu": "amenajarii teritoriului, urbanismului si constructiilor"},
-    "contencios administrativ": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ"},
-    "legea contenciosului administrativ": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ"},
-    "legea locuintei": {"numar": "114", "an": "1996", "titlu": "Legea locuintei"},
-    "legea societatilor": {"numar": "31", "an": "1990", "titlu": "societatilor"},
-    "legea urbanismului": {"numar": "350", "an": "2001", "titlu": "amenajarea teritoriului si urbanismul"},
-    "autorizarea constructiilor": {"numar": "50", "an": "1991", "titlu": "autorizarea executarii lucrarilor de constructii"},
-    "regimul contraventiilor": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contraventiilor"},
-    "stare civila": {"numar": "119", "an": "1996", "titlu": "actele de stare civila"},
-    "asociatii de proprietari": {"numar": "196", "an": "2018", "titlu": "asociatiilor de proprietari"},
-    "accesul la informatii de interes public": {"numar": "544", "an": "2001", "titlu": "liberul acces la informatiile de interes public"},
-    "transparenta decizionala": {"numar": "52", "an": "2003", "titlu": "transparenta decizionala in administratia publica"},
-    "norme de tehnica legislativa": {"numar": "24", "an": "2000", "titlu": "normele de tehnica legislativa"},
-    "achizitii publice": {"numar": "98", "an": "2016", "titlu": "achizitiile publice"},
+    "codul urbanismului": {"numar": "169", "an": "2026", "titlu": "amenajării teritoriului, urbanismului și construcțiilor"},
+    "catuc": {"numar": "169", "an": "2026", "titlu": "amenajării teritoriului, urbanismului și construcțiilor"},
+    "contencios administrativ": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ", "doc_id": "57426"},
+    "legea contenciosului administrativ": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ", "doc_id": "57426"},
+    "legea 554/2004": {"numar": "554", "an": "2004", "titlu": "contenciosului administrativ", "doc_id": "57426"},
+    "legea locuintei": {"numar": "114", "an": "1996", "titlu": "legea locuinţei", "tip_act": "LEGE", "doc_id": "8597"},
+    "legea 114/1996": {"numar": "114", "an": "1996", "titlu": "legea locuinţei", "tip_act": "LEGE", "doc_id": "8597"},
+    "legea societatilor": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "737"},
+    "legea 31/1990": {"numar": "31", "an": "1990", "titlu": "societăţilor", "tip_act": "LEGE", "doc_id": "737"},
+    "legea urbanismului": {"numar": "350", "an": "2001", "titlu": "amenajarea teritoriului", "tip_act": "LEGE", "doc_id": "29453"},
+    "legea 350/2001": {"numar": "350", "an": "2001", "titlu": "amenajarea teritoriului", "tip_act": "LEGE", "doc_id": "29453"},
+    "autorizarea constructiilor": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1449"},
+    "legea 50/1991": {"numar": "50", "an": "1991", "titlu": "autorizarea executării lucrărilor de construcţii", "tip_act": "LEGE", "doc_id": "1449"},
+    "regimul contraventiilor": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
+    "og 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
+    "og nr. 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
+    "ordonanta 2/2001": {"numar": "2", "an": "2001", "titlu": "regimul juridic al contravenţiilor", "tip_act": "ORDONANȚĂ", "doc_id": "29779"},
+    "stare civila": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8613"},
+    "legea 119/1996": {"numar": "119", "an": "1996", "titlu": "actele de stare civilă", "tip_act": "LEGE", "doc_id": "8613"},
+    "legea 7/1996": {"numar": "7", "an": "1996", "titlu": "cadastrului şi a publicităţii imobiliare", "tip_act": "LEGE", "doc_id": "7863"},
+    "asociatii de proprietari": {"numar": "196", "an": "2018", "titlu": "asociaţiilor de proprietari", "tip_act": "LEGE", "doc_id": "203233"},
+    "legea 196/2018": {"numar": "196", "an": "2018", "titlu": "asociaţiilor de proprietari", "tip_act": "LEGE", "doc_id": "203233"},
+    "accesul la informatii de interes public": {"numar": "544", "an": "2001", "titlu": "liberul acces la informaţiile de interes public", "tip_act": "LEGE", "doc_id": "31413"},
+    "transparenta decizionala": {"numar": "52", "an": "2003", "titlu": "transparenţa decizională", "tip_act": "LEGE", "doc_id": "41571"},
+    "norme de tehnica legislativa": {"numar": "24", "an": "2000", "titlu": "normele de tehnică legislativă", "tip_act": "LEGE", "doc_id": "21698"},
+    "legea 24/2000": {"numar": "24", "an": "2000", "titlu": "normele de tehnică legislativă", "tip_act": "LEGE", "doc_id": "21698"},
+    "achizitii publice": {"numar": "98", "an": "2016", "titlu": "achiziţiile publice", "tip_act": "LEGE", "doc_id": "178667"},
 }
 
 
@@ -322,6 +337,81 @@ def clean_soap_text(raw_text: str) -> str:
     return txt.strip()
 
 
+def parse_articles_from_consolidated_html(raw_html: str) -> list[dict[str, str]]:
+    """
+    Parseaza direct clasele oficiale CTCE din pagina `LinkHtml` (DetaliiDocument/{id}):
+    - `.S_ART_TTL` + `.S_ART_BDY` (textul consolidat la zi al articolului, cu toate modificarile integrate!)
+    - `.S_NTA` si `.S_PAR` (notele de modificare, Deciziile CCR si RIL/HP ICCJ atasate direct sub alineat!)
+    """
+    if not raw_html or "S_ART_TTL" not in raw_html:
+        return []
+
+    # Colectam pozitiile titlurilor/capitolelor
+    struct_re = re.compile(
+        r'<span\s+class="S_(?:TTL|CAP|SEC|PRT|CRT)_TTL"[^>]*>([\s\S]*?)</span>',
+        flags=re.IGNORECASE,
+    )
+    struct_positions: list[tuple[int, str]] = [
+        (m.start(), clean_soap_text(m.group(1))) for m in struct_re.finditer(raw_html)
+    ]
+
+    def get_section_at(pos: int) -> str:
+        recent = [label for p, label in struct_positions if p < pos and label]
+        return " > ".join(recent[-2:]) if recent else "Dispoziții generale"
+
+    art_ttl_re = re.compile(
+        r'<span\s+class="S_ART_TTL"[^>]*>([\s\S]*?)</span>',
+        flags=re.IGNORECASE,
+    )
+    matches = list(art_ttl_re.finditer(raw_html))
+    if not matches:
+        return []
+
+    note_span_re = re.compile(
+        r'<span\s+class="S_(?:NTA|PAR)"[^>]*>([\s\S]*?)</span>',
+        flags=re.IGNORECASE,
+    )
+
+    articles: list[dict[str, str]] = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(raw_html)
+        block_html = raw_html[start:end]
+
+        # Taiem la inceputul urmatorului Capitol/Titlu/Subsol daca se afla in interiorul blocului
+        next_structs = [p for p, _ in struct_positions if start < p < end]
+        if next_structs:
+            block_html = raw_html[start : next_structs[0]]
+
+        art_label = clean_soap_text(m.group(1))
+        num_m = re.search(
+            r"(?i)^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b",
+            art_label.strip(),
+        )
+        art_num = num_m.group(1).lower() if num_m else str(i + 1)
+
+        content_clean = clean_soap_text(block_html)
+        notes_found = [
+            line.strip()
+            for line in content_clean.splitlines()
+            if re.search(
+                r"(?i)(\(la\s+[0-9]{2}-[0-9]{2}-[0-9]{4}|Notă|Nota|Decizia\s+(?:ÎCCJ|ICCJ|CCR)|Recurs\s+în\s+interesul\s+legii|Hotărâre\s+prealabilă|neconstituțional)",
+                line,
+            )
+        ]
+        articles.append(
+            {
+                "art_num": art_num,
+                "art_label": art_label,
+                "section_path": get_section_at(start),
+                "content": content_clean,
+                "notes": "\n".join(notes_found[:12]),
+            }
+        )
+
+    return articles
+
+
 def parse_articles_from_text(raw_text: str) -> list[dict[str, str]]:
     text = clean_soap_text(raw_text)
     if not text:
@@ -523,7 +613,7 @@ class LegislatieJustRoClient:
         numar_pagina: int = 0,
         rezultate_pagina: int = 5,
     ) -> list[dict[str, Any]]:
-        rezultate_pagina = max(0, min(rezultate_pagina, 10))
+        rezultate_pagina = max(0, min(rezultate_pagina, 30))
         cache_params = {
             "an": search_an.strip(),
             "numar": search_numar.strip(),
@@ -602,11 +692,30 @@ ACT_REF_RE = re.compile(
 )
 
 
+def normalize_tip_act(raw_prefix: str) -> str:
+    p = strip_diacritics_lower(raw_prefix).replace(".", "")
+    if p in ("oug", "ordonanta de urgenta"):
+        return "ORDONANȚĂ DE URGENȚĂ"
+    if p in ("og", "ordonanta"):
+        return "ORDONANȚĂ"
+    if p in ("hg", "hotararea", "hotarare"):
+        return "HOTĂRÂRE"
+    if p in ("legea", "lege"):
+        return "LEGE"
+    if p in ("ordinul", "ordin"):
+        return "ORDIN"
+    if p in ("decizia", "decizie", "ril", "hp"):
+        return "DECIZIE"
+    return ""
+
+
 def parse_act_identifier(act_query: str) -> dict[str, str]:
     norm = strip_diacritics_lower(act_query)
     for alias, meta in ALIASURI_ACTE.items():
         if alias in norm:
             return {
+                "doc_id": meta.get("doc_id", ""),
+                "tip_act": meta.get("tip_act", ""),
                 "numar": meta["numar"],
                 "an": meta["an"],
                 "titlu": meta.get("titlu", ""),
@@ -616,6 +725,8 @@ def parse_act_identifier(act_query: str) -> dict[str, str]:
     m = ACT_REF_RE.search(norm)
     if m:
         return {
+            "doc_id": "",
+            "tip_act": normalize_tip_act(m.group(1) or ""),
             "numar": m.group(2),
             "an": m.group(3),
             "titlu": "",
@@ -623,6 +734,8 @@ def parse_act_identifier(act_query: str) -> dict[str, str]:
         }
 
     return {
+        "doc_id": "",
+        "tip_act": "",
         "numar": "",
         "an": "",
         "titlu": act_query.strip(),
@@ -670,31 +783,112 @@ class LegislatieMCPTools:
         an: str = "",
         cuvinte_cheie_text: str = "",
     ) -> list[dict[str, Any]]:
+        parsed = parse_act_identifier(act)
+        doc_id = parsed.get("doc_id", "")
+        expected_tip = parsed.get("tip_act", "")
         if act and not (numar or an):
-            parsed = parse_act_identifier(act)
             numar = parsed["numar"]
             an = parsed["an"]
             titlu = parsed["titlu"]
         else:
-            titlu = act.strip()
+            titlu = parsed["titlu"] or act.strip()
 
-        results = self.client.search(
-            search_an=an,
-            search_numar=numar,
-            search_titlu=titlu if not (numar and an) else "",
-            search_text=cuvinte_cheie_text,
-            numar_pagina=0,
-            rezultate_pagina=5,
-        )
-        if not results and titlu:
+        # Daca actul are ID canonic direct in legislatie.just.ro (ex: Coduri, OG 2/2001, Legea 114/1996, Legea 554/2004),
+        # construim direct intrarea catre DetaliiDocument/{doc_id} pentru extragere 100% determinista din forma consolidata la zi!
+        if doc_id and not cuvinte_cheie_text:
+            link = f"https://legislatie.just.ro/Public/DetaliiDocument/{doc_id}"
+            synthetic = {
+                "act_key": doc_id,
+                "tip_act": expected_tip or "ACT NORMATIV",
+                "numar": numar,
+                "data_vigoare": an,
+                "titlu": f"{expected_tip or 'Act'} nr. {numar}/{an} ({titlu})",
+                "emitent": "Parlamentul / Guvernul României",
+                "publicatie": "Monitorul Oficial",
+                "link_html": link,
+                "text": "CONSOLIDATED_LINK",
+            }
+            self.cache.save_act_and_articles(synthetic)
+            return [synthetic]
+
+        # Cand cunoastem Numarul si Anul (ex: 2 / 2001), cautam direct dupa An + Numar (fara SearchTitlu,
+        # deoarece SearchTitlu in SOAP este sensibil la cedila vs virgula) cu RezultatePagina=25
+        # si filtram determinist in Python dupa TipAct (LEGE vs ORDONANTA vs OUG vs HG) si Titlu!
+        if numar and an:
             results = self.client.search(
                 search_an=an,
                 search_numar=numar,
                 search_titlu="",
-                search_text=titlu,
+                search_text=cuvinte_cheie_text,
                 numar_pagina=0,
-                rezultate_pagina=5,
+                rezultate_pagina=25,
             )
+        else:
+            results = self.client.search(
+                search_an=an,
+                search_numar=numar,
+                search_titlu=titlu,
+                search_text=cuvinte_cheie_text,
+                numar_pagina=0,
+                rezultate_pagina=10,
+            )
+            if not results and titlu:
+                results = self.client.search(
+                    search_an=an,
+                    search_numar=numar,
+                    search_titlu="",
+                    search_text=titlu,
+                    numar_pagina=0,
+                    rezultate_pagina=10,
+                )
+
+        # Daca avem un sub-sir de titlu din alias (ex: "regimul juridic al contraventiilor"), filtram local fara diacritice
+        if titlu and results and (numar and an):
+            norm_t = strip_diacritics_lower(titlu)
+            if not ACT_REF_RE.search(norm_t):
+                title_matches = [
+                    r for r in results if norm_t in strip_diacritics_lower(r.get("titlu", ""))
+                ]
+                if title_matches:
+                    return title_matches
+
+        # Daca utilizatorul a cerut explicit OG (si nu OUG/DECIZIE) sau LEGE, filtram prioritizand TipAct exact
+        if expected_tip and results:
+            norm_exp = strip_diacritics_lower(expected_tip)
+            exact_matches = [
+                r for r in results if strip_diacritics_lower(r.get("tip_act", "")) == norm_exp
+            ]
+            if exact_matches:
+                return exact_matches
+            # Daca pe pagina 0 nu era niciun act cu TipAct-ul cerut (ex: OG nr. 2 e pe pagina 1 dupa Decizii/Ordine),
+            # cautam cu SearchTitlu=titlu sau pe pagina 1
+            if titlu:
+                by_title = self.client.search(
+                    search_an=an,
+                    search_numar=numar,
+                    search_titlu=titlu,
+                    search_text=cuvinte_cheie_text,
+                    numar_pagina=0,
+                    rezultate_pagina=10,
+                )
+                exact_by_title = [
+                    r for r in by_title if strip_diacritics_lower(r.get("tip_act", "")) == norm_exp
+                ]
+                if exact_by_title:
+                    return exact_by_title
+            page1 = self.client.search(
+                search_an=an,
+                search_numar=numar,
+                search_titlu="",
+                search_text=cuvinte_cheie_text,
+                numar_pagina=1,
+                rezultate_pagina=25,
+            )
+            exact_p1 = [
+                r for r in page1 if strip_diacritics_lower(r.get("tip_act", "")) == norm_exp
+            ]
+            if exact_p1:
+                return exact_p1
         return results
 
     def cauta_acte_normative(
@@ -756,6 +950,59 @@ class LegislatieMCPTools:
             "disclaimer": DISCLAIMER_LEGAL,
         }
 
+    def _ensure_consolidated_articles(self, act_meta: dict[str, Any]) -> None:
+        """
+        Daca actul are un `link_html` oficial (ex: http://legislatie.just.ro/Public/DetaliiDocument/29779),
+        preia o singura data pagina consolidata la zi si inlocuieste articolele din SQLite cu forma
+        consolidata la zi (care include toate modificarile recente + notele .S_NTA/.S_PAR cu RIL/HP/CCR).
+        """
+        act_key = act_meta.get("act_key") or ""
+        link = (act_meta.get("link_html") or "").strip()
+        if not act_key or not link:
+            return
+
+        cur = self.cache.conn.execute(
+            "SELECT COUNT(*) AS cnt FROM articles WHERE act_key = ? AND notes IS NOT NULL AND length(notes) > 0",
+            (act_key,),
+        )
+        row = cur.fetchone()
+        if row and row["cnt"] > 0:
+            return
+
+        https_link = re.sub(r"^http://", "https://", link)
+        try:
+            self.client._throttle()
+            req = urllib.request.Request(
+                https_link,
+                headers={"User-Agent": "legislatie-ro-mcp/1.0 (Consolidated View Reader)"},
+            )
+            with urllib.request.urlopen(req, timeout=20.0) as resp:
+                raw_html = resp.read().decode("utf-8", errors="replace")
+            consolidated_arts = parse_articles_from_consolidated_html(raw_html)
+            if consolidated_arts:
+                with self.cache.conn:
+                    self.cache.conn.execute("DELETE FROM articles WHERE act_key = ?", (act_key,))
+                    self.cache.conn.executemany(
+                        """
+                        INSERT INTO articles (act_key, art_num, art_label, section_path, content, notes, ord_index)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        [
+                            (
+                                act_key,
+                                a["art_num"],
+                                a["art_label"],
+                                a["section_path"],
+                                a["content"],
+                                a["notes"],
+                                idx,
+                            )
+                            for idx, a in enumerate(consolidated_arts)
+                        ],
+                    )
+        except Exception:
+            pass
+
     def extrage_articole_din_act(
         self,
         act: str,
@@ -778,6 +1025,7 @@ class LegislatieMCPTools:
 
         # Alegem actul principal (cel cu textul cel mai complet, evitand actele scurte de modificare daca se cauta legea de baza)
         best = max(results, key=lambda x: len(x.get("text") or ""))
+        self._ensure_consolidated_articles(best)
         act_key = best["act_key"]
 
         cur = self.cache.conn.execute(
