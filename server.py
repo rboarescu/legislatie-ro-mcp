@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import sqlite3
@@ -810,6 +811,12 @@ ACT_REF_RE = re.compile(
     r"(?:nr\.\s*)?([0-9]{1,5})\s*(?:/|\s+din\s+)(?:[0-9]{1,2}[./][0-9]{1,2}[./])?((?:19|20)[0-9]{2})\b"
 )
 
+# Tip + numar fara an (ex: "HG 859"): anul se clarifica ulterior, nu se ghiceste
+ACT_REF_NO_YEAR_RE = re.compile(
+    r"(?i)\b(legea|lege|oug|o\.u\.g\.|ordonanta de urgenta|og|o\.g\.|hg|h\.g\.|hotararea|ordinul|ordin|decizia|decizie)\s*"
+    r"(?:nr\.\s*)?([0-9]{1,5})\b"
+)
+
 
 def normalize_tip_act(raw_prefix: str) -> str:
     p = strip_diacritics_lower(raw_prefix).replace(".", "")
@@ -852,6 +859,17 @@ def parse_act_identifier(act_query: str) -> dict[str, str]:
             "text": "",
         }
 
+    m = ACT_REF_NO_YEAR_RE.search(norm)
+    if m:
+        return {
+            "doc_id": "",
+            "tip_act": normalize_tip_act(m.group(1)),
+            "numar": m.group(2),
+            "an": "",
+            "titlu": "",
+            "text": "",
+        }
+
     return {
         "doc_id": "",
         "tip_act": "",
@@ -864,36 +882,157 @@ def parse_act_identifier(act_query: str) -> dict[str, str]:
 
 def parse_article_numbers(articole_spec: str) -> list[str]:
     """
-    Transforma specificatii precum '38, 39', 'art. 38-40', '11', '3^1' intr-o lista de numere de articol.
+    Transforma specificatii precum '38, 39', 'art. 38-40', '11 alin. (2) lit. c)', '3^1', 'I, II'
+    intr-o lista de numere de articol (alineatele/literele se ignora: se returneaza articolul intreg).
     """
-    cleaned = re.sub(r"(?i)\b(articolul|articolele|art\.?)\b", " ", articole_spec)
+    cleaned = re.sub(
+        r"(?i)\b(?:alin(?:eatul)?|lit(?:era)?|pct|punctul|teza)\.?\s*\(?[0-9a-z^]+\)?", " ", articole_spec
+    )
+    cleaned = re.sub(r"(?i)\b(articolul|articolele|art\.?)", " ", cleaned)
     result: list[str] = []
-    for part in re.split(r"[,;]+", cleaned):
+    for part in re.split(r"[,;]+|\s+[sș]i\s+", cleaned):
         part = part.strip()
         if not part:
             continue
-        range_m = re.match(r"^(\d+)\s*[-–..]+\s*(\d+)$", part)
+        range_m = re.match(r"^(\d+)\s*[-–]+\s*(\d+)$", part)
         if range_m:
             start_n, end_n = int(range_m.group(1)), int(range_m.group(2))
-            if start_n <= end_n and (end_n - start_n) <= 15:
-                result.extend(str(n) for n in range(start_n, end_n + 1))
-                continue
-        tokens = re.findall(r"[0-9]+(?:\^[0-9]+)?|[IVXLCDM]+", part, flags=re.IGNORECASE)
-        for tok in tokens:
+            result.extend(str(n) for n in range(start_n, min(end_n, start_n + 30) + 1) if str(n) not in result)
+            continue
+        # Cifrele romane doar ca majuscule de sine statatoare (articolele actelor de modificare: "Articolul I")
+        for tok in re.findall(r"[0-9]+(?:\^[0-9]+)?|\b[IVXLCDM]+\b", part):
             t_low = tok.lower()
             if t_low not in result:
                 result.append(t_low)
     return result
 
 
+# Cuvinte fara valoare de cautare (dupa eliminarea diacriticelor)
+SEARCH_STOPWORDS = set(
+    "de la si in din pe pt pentru cu fara a al ale ai o un unei unui care ce sa se nu sau iar daca cand prin "
+    "privind despre fata dupa catre spre este sunt fi mai cel cea cei cele acest aceasta lege legea art articol "
+    "articolul alin hg oug og nr".split()
+)
+# Terminatii flexionare frecvente in romana (cele mai lungi primele): "termenele" -> "termen", "topografie" -> "topograf"
+SEARCH_SUFFIXES = ["urilor", "elor", "ilor", "ului", "uri", "ele", "ile", "iei", "ii", "ie", "ia", "ea", "ul", "le", "a", "e", "i", "u"]
+
+
+def stem_ro(token: str) -> str:
+    for suffix in SEARCH_SUFFIXES:
+        if token.endswith(suffix) and len(token) - len(suffix) >= 4:
+            return token[: -len(suffix)]
+    return token
+
+
+def search_stems(query: str) -> list[str]:
+    tokens = [t for t in re.split(r"[^a-z0-9]+", strip_diacritics_lower(query)) if len(t) >= 3 and t not in SEARCH_STOPWORDS]
+    return list(dict.fromkeys(stem_ro(t) for t in tokens))
+
+
+def rank_articles(texts: list[str], query: str) -> tuple[list[str], list[tuple[int, float, list[str]]]]:
+    """
+    Clasament pe articole: fiecare radacina gasita la inceput de cuvant valoreaza mai mult cu cat e mai rara in act (IDF).
+    Intoarce (radacini, [(index, scor, radacini_gasite)]) sortat descrescator dupa scor.
+    """
+    stems = search_stems(query)
+    if not stems:
+        return stems, []
+    docs = [strip_diacritics_lower(t) for t in texts]
+    patterns = [re.compile(rf"\b{re.escape(s)}") for s in stems]
+    df = [sum(1 for d in docs if p.search(d)) for p in patterns]
+    ranked: list[tuple[int, float, list[str]]] = []
+    for i, d in enumerate(docs):
+        score = 0.0
+        found: list[str] = []
+        for k, p in enumerate(patterns):
+            hits = len(p.findall(d))
+            if hits:
+                found.append(stems[k])
+                score += math.log(1 + len(docs) / df[k]) * (1 + math.log(hits))
+        if found:
+            ranked.append((i, score, found))
+    ranked.sort(key=lambda r: (-r[1], r[0]))
+    return stems, ranked
+
+
+INSTRUCTIUNI_MODEL = (
+    "Citeaza si rezuma DOAR din textul articolelor returnate. Daca informatia ceruta (termene, documente, institutii) "
+    "nu apare in acest text, spune explicit ca nu ai gasit-o in act si NU o completa din memorie. Pentru alte articole "
+    "reapeleaza `extrage_articole_din_act` (vezi `cuprins_articole` sau `exploreaza_cuprinsul_actului`) ori cauta cu alti "
+    "termeni, in limbajul legii (ex: 'aeronave fara pilot' in loc de 'drone')."
+)
+
+
 # ============================================================================
 # Implementarea celor 5 Unelte MCP (Tools)
 # ============================================================================
+
+class ActAmbiguu(Exception):
+    """Actul nu poate fi identificat fara an; `response` este raspunsul de returnat modelului."""
+
+    def __init__(self, response: dict[str, Any]) -> None:
+        super().__init__(response.get("mesaj", "act ambiguu"))
+        self.response = response
+
+
+def article_summary(row: sqlite3.Row) -> str:
+    rest = " ".join(row["content"].split("\n")[1:])
+    return f"{row['art_label']}: {rest[:90] + '…' if len(rest) > 90 else rest}"
+
 
 class LegislatieMCPTools:
     def __init__(self) -> None:
         self.cache = LocalLegisCache()
         self.client = LegislatieJustRoClient(self.cache)
+
+    def _act_rows(self, act_key: str) -> list[sqlite3.Row]:
+        return self.cache.conn.execute(
+            "SELECT art_num, art_label, section_path, content, notes, ord_index FROM articles WHERE act_key = ? ORDER BY ord_index ASC",
+            (act_key,),
+        ).fetchall()
+
+    def _resolve_number_without_year(self, numar: str, expected_tip: str, act: str, indiciu: str) -> list[dict[str, Any]]:
+        """
+        API-ul intoarce max. 20 de rezultate pe pagina, cele mai vechi primele, deci pentru un numar folosit in multi ani
+        lista completa nu e accesibila. Restrangem cu cuvintele-cheie (cautare in textul actelor); altfel cerem anul.
+        """
+        norm_exp = strip_diacritics_lower(expected_tip)
+        words = [t for t in indiciu.split() if len(t) >= 4 and strip_diacritics_lower(t) not in SEARCH_STOPWORDS]
+        tries = ([indiciu] + (words[:3] if len(words) > 1 else [])) if indiciu.strip() else []
+        found: dict[str, dict[str, Any]] = {}
+        for text in tries:
+            for r in self.client.search(search_numar=numar, search_text=text, rezultate_pagina=20):
+                if r.get("numar") == numar and (not norm_exp or strip_diacritics_lower(r.get("tip_act", "")) == norm_exp):
+                    found[r.get("link_html") or r["act_key"]] = r
+            if found:
+                break
+        if len(found) == 1:
+            return list(found.values())
+        raise ActAmbiguu(
+            {
+                "ambiguu": True,
+                "mesaj": (
+                    f"Exista mai multe acte cu numarul {numar} (din ani diferiti)"
+                    + (
+                        ", iar cuvintele-cheie se potrivesc cu mai multe dintre ele (vezi candidati)."
+                        if found
+                        else " si cuvintele-cheie nu au restrans cautarea."
+                    )
+                    + f" Reapeleaza unealta cu anul (ex: '{act.strip() or numar}/2021'). Daca anul nu reiese din context, "
+                    "intreaba utilizatorul; NU presupune continutul actului."
+                ),
+                "candidati": [
+                    {
+                        "act": f"{r.get('tip_act')} nr. {r.get('numar')}",
+                        "data": r.get("data_vigoare"),
+                        "titlu": (r.get("titlu") or "")[:200],
+                        "link_oficial": r.get("link_html"),
+                    }
+                    for r in found.values()
+                ],
+                "disclaimer": DISCLAIMER_LEGAL,
+            }
+        )
 
     def _find_best_act(
         self,
@@ -901,7 +1040,12 @@ class LegislatieMCPTools:
         numar: str = "",
         an: str = "",
         cuvinte_cheie_text: str = "",
+        indiciu: str = "",
     ) -> list[dict[str, Any]]:
+        """
+        `cuvinte_cheie_text` filtreaza cautarea SOAP; `indiciu` (cuvintele-cheie ale utilizatorului) se foloseste
+        doar pentru a alege actul cand numarul nu are an. Ridica `ActAmbiguu` cand actul nu poate fi identificat.
+        """
         parsed = parse_act_identifier(act)
         doc_id = parsed.get("doc_id", "")
         expected_tip = parsed.get("tip_act", "")
@@ -912,9 +1056,12 @@ class LegislatieMCPTools:
         else:
             titlu = parsed["titlu"] or act.strip()
 
+        if numar and not an and not doc_id:
+            return self._resolve_number_without_year(numar, expected_tip, act, indiciu or cuvinte_cheie_text)
+
         # Daca actul are ID canonic direct in legislatie.just.ro (ex: Coduri, OG 2/2001, Legea 114/1996, Legea 554/2004),
         # construim direct intrarea catre DetaliiDocument/{doc_id} pentru extragere 100% determinista din forma consolidata la zi!
-        if doc_id and not cuvinte_cheie_text:
+        if doc_id:
             link = f"https://legislatie.just.ro/Public/DetaliiDocument/{doc_id}"
             synthetic = {
                 "act_key": doc_id,
@@ -979,8 +1126,9 @@ class LegislatieMCPTools:
             ]
             if exact_matches:
                 return exact_matches
-            # Daca pe pagina 0 nu era niciun act cu TipAct-ul cerut (ex: OG nr. 2 e pe pagina 1 dupa Decizii/Ordine),
-            # cautam cu SearchTitlu=titlu sau pe pagina 1
+            # Daca pe prima pagina nu era niciun act cu TipAct-ul cerut (ex: OG nr. 2 e dupa Decizii/Ordine),
+            # cautam cu SearchTitlu=titlu sau pe pagina urmatoare. Paginarea API-ului incepe de la 1
+            # (NumarPagina 0 si 1 intorc aceeasi pagina) si are max. 20 de rezultate, cele mai vechi primele.
             if titlu:
                 by_title = self.client.search(
                     search_an=an,
@@ -1000,8 +1148,8 @@ class LegislatieMCPTools:
                 search_numar=numar,
                 search_titlu="",
                 search_text=cuvinte_cheie_text,
-                numar_pagina=1,
-                rezultate_pagina=25,
+                numar_pagina=2,
+                rezultate_pagina=20,
             )
             exact_p1 = [
                 r for r in page1 if strip_diacritics_lower(r.get("tip_act", "")) == norm_exp
@@ -1063,11 +1211,14 @@ class LegislatieMCPTools:
                 }
             )
 
-        return {
-            "total_gasite": len(formatted),
-            "acte": formatted,
-            "disclaimer": DISCLAIMER_LEGAL,
-        }
+        result: dict[str, Any] = {"total_gasite": len(formatted), "acte": formatted}
+        if s_numar and not s_an and formatted:
+            result["nota"] = (
+                f"Fara an, API-ul intoarce doar primele ~20 de acte cu numarul {s_numar}, cele mai vechi primele; "
+                "lista poate sa nu contina actul cautat. Precizati anul."
+            )
+        result["disclaimer"] = DISCLAIMER_LEGAL
+        return result
 
     def _ensure_consolidated_articles(self, act_meta: dict[str, Any]) -> None:
         """
@@ -1145,7 +1296,10 @@ class LegislatieMCPTools:
         impreuna cu articolele vecine (±1) si notele de modificare / RIL / HP / CCR.
         """
         req_nums = parse_article_numbers(articole)
-        results = self._find_best_act(act=act, numar=numar, an=an)
+        try:
+            results = self._find_best_act(act=act, numar=numar, an=an)
+        except ActAmbiguu as amb:
+            return amb.response
         if not results:
             return {
                 "eroare": f"Nu s-a gasit actul normativ '{act}' (numar={numar}, an={an}) in legislatie.just.ro.",
@@ -1156,12 +1310,7 @@ class LegislatieMCPTools:
         best = max(results, key=lambda x: len(x.get("text") or ""))
         self._ensure_consolidated_articles(best)
         act_key = best["act_key"]
-
-        cur = self.cache.conn.execute(
-            "SELECT art_num, art_label, section_path, content, notes, ord_index FROM articles WHERE act_key = ? ORDER BY ord_index ASC",
-            (act_key,),
-        )
-        all_rows = cur.fetchall()
+        all_rows = self._act_rows(act_key)
 
         matched_indices: set[int] = set()
         for idx, row in enumerate(all_rows):
@@ -1217,7 +1366,9 @@ class LegislatieMCPTools:
                             }
                         )
 
-        return {
+        found_nums = {e["numar_articol"].lower() for e in extracted}
+        missing = [n for n in req_nums if n not in found_nums]
+        result: dict[str, Any] = {
             "act": {
                 "tip_act": best.get("tip_act"),
                 "numar": best.get("numar"),
@@ -1227,10 +1378,18 @@ class LegislatieMCPTools:
                 "publicatie": best.get("publicatie"),
                 "link_oficial": best.get("link_html"),
             },
+            "numar_articole_in_act": len(all_rows),
             "articole_cerute": req_nums,
-            "articole_extrase": extracted,
-            "disclaimer": DISCLAIMER_LEGAL,
         }
+        if missing:
+            result["articole_negasite"] = missing
+        result["articole_extrase"] = extracted
+        # Harta actului pentru apeluri ulterioare tintite (doar pentru acte de dimensiune rezonabila)
+        if 0 < len(all_rows) <= 80:
+            result["cuprins_articole"] = [article_summary(r) for r in all_rows]
+        result["instructiuni_model"] = INSTRUCTIUNI_MODEL
+        result["disclaimer"] = DISCLAIMER_LEGAL
+        return result
 
     def cauta_in_interiorul_actului(
         self,
@@ -1244,44 +1403,37 @@ class LegislatieMCPTools:
         Unealta 3: Cauta cuvinte-cheie sau concepte juridice in interiorul unui act normativ
         (sau in toata legislatia daca actul nu este specificat) si returneaza articolele exacte.
         """
-        results = self._find_best_act(
-            act=act,
-            numar=numar,
-            an=an,
-            cuvinte_cheie_text=cuvinte_cheie if not act else "",
-        )
+        act_given = bool(act or numar)
+        try:
+            results = self._find_best_act(
+                act=act,
+                numar=numar,
+                an=an,
+                cuvinte_cheie_text="" if act_given else cuvinte_cheie,
+                indiciu=cuvinte_cheie,
+            )
+        except ActAmbiguu as amb:
+            return amb.response
         if not results:
             return {
                 "eroare": f"Nu s-au gasit acte pentru '{act}' / '{cuvinte_cheie}'.",
                 "disclaimer": DISCLAIMER_LEGAL,
             }
 
-        query_terms = [
-            strip_diacritics_lower(t)
-            for t in re.split(r"\s+", cuvinte_cheie.strip())
-            if len(t.strip()) >= 2
-        ]
+        # Cu act precizat cautam in forma lui consolidata; fara act, in primele acte gasite de API dupa text
+        acts = [max(results, key=lambda x: len(x.get("text") or ""))] if act_given else results[:3]
+        entries: list[tuple[dict[str, Any], sqlite3.Row]] = []
+        for act_meta in acts:
+            self._ensure_consolidated_articles(act_meta)
+            entries.extend((act_meta, row) for row in self._act_rows(act_meta["act_key"]))
 
-        scored_hits: list[tuple[int, dict[str, Any], sqlite3.Row]] = []
-        for r in results:
-            act_key = r["act_key"]
-            cur = self.cache.conn.execute(
-                "SELECT art_num, art_label, section_path, content, notes FROM articles WHERE act_key = ? ORDER BY ord_index ASC",
-                (act_key,),
-            )
-            for row in cur.fetchall():
-                norm_content = strip_diacritics_lower(f"{row['content']}\n{row['notes'] or ''}")
-                score = sum(norm_content.count(term) for term in query_terms if term in norm_content)
-                distinct_matched = sum(1 for term in query_terms if term in norm_content)
-                if distinct_matched > 0:
-                    total_score = distinct_matched * 100 + score
-                    scored_hits.append((total_score, r, row))
-
-        scored_hits.sort(key=lambda x: x[0], reverse=True)
-        top_hits = scored_hits[: max(1, min(limita_articole, 15))]
-
+        stems, ranked = rank_articles(
+            [f"{row['content']}\n" + "\n".join(decode_notes(row["notes"]) or []) for _, row in entries],
+            cuvinte_cheie,
+        )
         fragmente: list[dict[str, Any]] = []
-        for score, act_meta, row in top_hits:
+        for idx, _score, found in ranked[: max(1, min(limita_articole, 15))]:
+            act_meta, row = entries[idx]
             fragmente.append(
                 {
                     "act": f"{act_meta.get('tip_act')} nr. {act_meta.get('numar')} ({act_meta.get('data_vigoare')})",
@@ -1289,17 +1441,28 @@ class LegislatieMCPTools:
                     "link_oficial": act_meta.get("link_html"),
                     "articol": row["art_label"],
                     "sectiune_capitol": row["section_path"],
+                    "termeni_gasiti": found,
                     "text_oficial": row["content"][:4000],
                     "note_modificari_ril_ccr": decode_notes(row["notes"]),
                 }
             )
 
-        return {
+        result: dict[str, Any] = {
             "cuvinte_cautate": cuvinte_cheie,
-            "total_articole_potrivite": len(scored_hits),
+            "termeni_cautati": stems,
+            "total_articole_potrivite": len(ranked),
             "rezultate": fragmente,
-            "disclaimer": DISCLAIMER_LEGAL,
         }
+        if not ranked:
+            result["mesaj"] = (
+                f"Niciun articol nu contine termenii [{', '.join(stems)}]. Incearca termenii folositi de lege"
+                + (" sau alege din cuprins_articole." if act_given else ".")
+            )
+        if act_given and 0 < len(entries) <= 80:
+            result["cuprins_articole"] = [article_summary(row) for _, row in entries]
+        result["instructiuni_model"] = INSTRUCTIUNI_MODEL
+        result["disclaimer"] = DISCLAIMER_LEGAL
+        return result
 
     def exploreaza_cuprinsul_actului(
         self,
@@ -1312,14 +1475,37 @@ class LegislatieMCPTools:
         Unealta 4: Returneaza cuprinsul pe Titluri / Capitole / Sectiuni si intervalele de articole
         ale unui act normativ (util pentru Coduri si legi ample).
         """
-        results = self._find_best_act(act=act, numar=numar, an=an)
+        try:
+            results = self._find_best_act(act=act, numar=numar, an=an)
+        except ActAmbiguu as amb:
+            return amb.response
         if not results:
             return {
                 "eroare": f"Nu s-a gasit actul '{act}'.",
                 "disclaimer": DISCLAIMER_LEGAL,
             }
         best = max(results, key=lambda x: len(x.get("text") or ""))
-        outline = extract_outline_from_text(best.get("text") or "")
+        self._ensure_consolidated_articles(best)
+
+        # Cuprinsul din forma consolidata: articolele consecutive din aceeasi sectiune formeaza o intrare
+        outline: list[dict[str, str]] = []
+        groups: list[list[Any]] = []  # [sectiune, primul_articol, ultimul_articol, numar_articole]
+        for row in self._act_rows(best["act_key"]):
+            if row["art_num"] in ("0", "integral"):
+                continue
+            if groups and groups[-1][0] == row["section_path"]:
+                groups[-1][2] = row["art_num"]
+                groups[-1][3] += 1
+            else:
+                groups.append([row["section_path"], row["art_num"], row["art_num"], 1])
+        if groups:
+            outline = [
+                {"sectiune": sec, "articole": f"Art. {first} .. Art. {last} ({n} articole)"}
+                for sec, first, last, n in groups
+            ]
+        else:
+            # Fara structura consolidata (doar text SOAP): reconstruim din titlurile din text
+            outline = extract_outline_from_text(best.get("text") or "")
         if filtru_sectiune:
             f_norm = strip_diacritics_lower(filtru_sectiune)
             outline = [
@@ -1335,7 +1521,7 @@ class LegislatieMCPTools:
                 "link_oficial": best.get("link_html"),
             },
             "numar_sectiuni": len(outline),
-            "cuprins": outline[:80],
+            "cuprins": outline[:120],
             "disclaimer": DISCLAIMER_LEGAL,
         }
 
@@ -1405,7 +1591,10 @@ SERVER_INSTRUCTIONS = (
     "CNP-uri, adrese sau date personale din documentul utilizatorului. Trimite exclusiv numere de "
     "acte normative, numere de articole si termeni juridici generici.\n"
     "4. In raspunsul final catre utilizator, citeaza exact articolele verificate si include intotdeauna "
-    "linkul oficial (`link_oficial`) catre legislatie.just.ro."
+    "linkul oficial (`link_oficial`) catre legislatie.just.ro.\n"
+    "5. Raspunde doar pe baza textului returnat. Daca acesta nu contine raspunsul (termen, document, institutie), "
+    "spune asta si cauta din nou (alte articole din `cuprins_articole` sau alti termeni, in limbajul legii); "
+    "nu completa din memorie. Indica actele cu tip, numar si an (ex: 'HG 859/2021'); la `ambiguu` cere anul."
 )
 
 MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
@@ -1458,11 +1647,11 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
             "properties": {
                 "act": {
                     "type": "string",
-                    "description": "Actul normativ (ex: 'Legea 114/1996', 'OUG 57/2019', 'Codul administrativ', 'Legea 554/2004').",
+                    "description": "Actul normativ cu tip, numar si AN (ex: 'Legea 114/1996', 'HG 859/2021', 'OUG 57/2019', 'Codul administrativ'). Fara an, raspunsul poate fi `ambiguu`.",
                 },
                 "articole": {
                     "type": "string",
-                    "description": "Articolul sau articolele dorite (ex: '38, 39', '11', '292, 354, 356', '582').",
+                    "description": "Articolul sau articolele dorite (ex: '38, 39', '11', '14-17', '582'). Alineatele/literele se ignora: se returneaza articolul intreg.",
                 },
                 "numar": {
                     "type": "string",
@@ -1494,11 +1683,11 @@ MCP_TOOLS_SCHEMA: list[dict[str, Any]] = [
             "properties": {
                 "cuvinte_cheie": {
                     "type": "string",
-                    "description": "Termenii juridici sau conceptele cautate (fara date personale din documentul utilizatorului).",
+                    "description": "Termenii cautati, in limbajul legii (ex: 'aeronave fara pilot fotografiere' in loc de 'drone'); fara date personale din documentul utilizatorului. Articolele sunt ordonate dupa relevanta.",
                 },
                 "act": {
                     "type": "string",
-                    "description": "Actul normativ in care se cauta (optional, ex: 'Codul administrativ', 'Legea 554/2004').",
+                    "description": "Actul normativ in care se cauta, cu an (optional, ex: 'Codul administrativ', 'Legea 554/2004', 'HG 859/2021').",
                 },
                 "numar": {
                     "type": "string",
