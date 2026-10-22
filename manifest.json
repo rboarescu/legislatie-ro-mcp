@@ -1,0 +1,41 @@
+{
+  "dxt_version": "0.1",
+  "name": "legislatie-ro-mcp",
+  "display_name": "Legislație România (legislatie.just.ro)",
+  "version": "1.0.0",
+  "description": "Conector oficial fără dependențe către legislația consolidată a României (legislatie.just.ro SOAP API) și EUR-Lex în limba română.",
+  "author": {
+    "name": "Radu Boarescu"
+  },
+  "license": "MIT",
+  "server": {
+    "type": "python",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "python3",
+      "args": ["${__dirname}/server.py"]
+    }
+  },
+  "tools": [
+    {
+      "name": "cauta_acte_normative",
+      "description": "Caută Legi, OUG, OG, HG, Ordine, RIL/HP ÎCCJ și Decizii CCR în legislatie.just.ro"
+    },
+    {
+      "name": "extrage_articole_din_act",
+      "description": "Extrage textul oficial la zi al unuia sau mai multor articole dintr-o lege/OUG/HG"
+    },
+    {
+      "name": "cauta_in_interiorul_actului",
+      "description": "Caută termeni juridici în interiorul unui act normativ și returnează articolele relevante"
+    },
+    {
+      "name": "exploreaza_cuprinsul_actului",
+      "description": "Returnează cuprinsul pe Titluri/Capitole/Secțiuni al unui act normativ"
+    },
+    {
+      "name": "cauta_legislatie_ue",
+      "description": "Preia Regulamente și Directive UE în limba română din EUR-Lex"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Legislație RO — Ancorare AI (legislatie.just.ro)",
+  "short_name": "LegislatieRO",
+  "version": "1.0.0",
+  "description": "Ancorează Gemini, ChatGPT și Claude în textul oficial la zi al legilor, OUG-urilor, HG-urilor și RIL-urilor din legislatie.just.ro.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://legislatie.just.ro/*",
+    "http://legislatie.just.ro/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Legislație RO — Căutare & Ancorare AI"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

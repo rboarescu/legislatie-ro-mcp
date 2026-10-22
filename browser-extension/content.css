@@ -1,0 +1,256 @@
+#legis-ro-floating-root {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483646;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+}
+
+#legis-ro-fab {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(30, 58, 138, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#legis-ro-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(30, 58, 138, 0.45);
+}
+
+#legis-ro-drawer {
+  position: fixed;
+  bottom: 72px;
+  right: 24px;
+  width: 410px;
+  max-width: calc(100vw - 32px);
+  max-height: 75vh;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.legis-ro-hidden {
+  display: none !important;
+}
+
+.legis-ro-header {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.legis-ro-header strong {
+  display: block;
+  font-size: 14px;
+}
+
+.legis-ro-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+#legis-ro-close {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.legis-ro-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legis-ro-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+#legis-ro-input {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+#legis-ro-input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}
+
+#legis-ro-search-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.legis-ro-secondary-btn {
+  width: 100%;
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.legis-ro-secondary-btn:hover {
+  background: #e2e8f0;
+}
+
+.legis-ro-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legis-ro-chip {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.legis-ro-chip:hover {
+  background: #dbeafe;
+}
+
+.legis-ro-chip-muted {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.legis-ro-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.legis-ro-empty,
+.legis-ro-loading {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.45;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+}
+
+.legis-ro-error {
+  font-size: 12px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.legis-ro-act-meta {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.legis-ro-act-title {
+  color: #475569;
+  font-size: 11px;
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.legis-ro-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.legis-ro-art-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+}
+
+.legis-ro-art-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 4px;
+}
+
+.legis-ro-art-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #1e293b;
+}
+
+.legis-ro-footer {
+  padding: 10px 14px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.legis-ro-primary-btn {
+  width: 100%;
+  background: #15803d;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.legis-ro-primary-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}

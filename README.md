@@ -42,9 +42,23 @@ Proiectat pentru a ancora modelele AI (Claude, ChatGPT, Gemini, Cursor, Antigrav
 
 ---
 
-## ⚙️ Instalare și Configurare Rapidă
+## ⚙️ Instalare „One-Click” (3 Moduri)
 
-### 1. Claude Desktop / Cursor / Antigravity / Windsurf (`stdio`)
+### Modul 1: Extensie de Browser (Pentru utilizatorii de rând în Gemini / ChatGPT / Claude Web — Fără Python!)
+Directorul **[`browser-extension/`](browser-extension)** (și arhiva gata împachetată `dist/legislatie-ro-browser-extension.zip`) conține o extensie Chrome / Edge / Brave / Firefox (Manifest V3) care **rulează 100% în browserul utilizatorului**, fără Python și fără niciun server intermediar:
+- Injectează automat butonul plutitor **`⚖️ Legislație RO`** direct peste `gemini.google.com`, `chatgpt.com` și `claude.ai`.
+- Are buton de **„🔍 Detectează legile din conversație”** (scanează pagina după `Legea X/Y`, `OUG X/Y`, `HG X/Y`, `Art. Z` și creează butoane rapide).
+- Interoghează direct API-ul SOAP oficial `legislatie.just.ro/apiws` din browserul utilizatorului (cu cache local în `chrome.storage.local` și rate-limiting de 1 req/sec) și **inserează cu 1 click textul oficial la zi direct în căsuța de prompt a AI-ului**.
+
+**Instalare rapidă în Chrome / Brave / Edge:**
+1. Deschideți `chrome://extensions/` și activați **Developer mode** (dreapta-sus).
+2. Apăsați **Load unpacked** (sau trageți arhiva) și selectați folderul `legislatie-ro-mcp/browser-extension`.
+
+### Modul 2: Pachet „One-Click” `.mcpb` pentru Claude Desktop
+1. Descărcați fișierul gata construit **`dist/legislatie-ro.mcpb`** (sau generați-l cu `python3 build_bundles.py`).
+2. Dați dublu-click pe `legislatie-ro.mcpb` sau trageți-l în **Claude Desktop $\rightarrow$ Settings $\rightarrow$ Extensions** și apăsați **Install**.
+
+### Modul 3: Configurare MCP Standard (`stdio` în Claude Code / Cursor / Antigravity / Windsurf)
 
 Adăugați în fișierul de configurare MCP (`claude_desktop_config.json` sau `mcp_config.json`):
 
@@ -59,7 +73,7 @@ Adăugați în fișierul de configurare MCP (`claude_desktop_config.json` sau `m
 }
 ```
 
-### 2. Rulare din linia de comandă (Testare / CLI)
+### Rulare din linia de comandă (Testare / CLI)
 
 ```bash
 # Testare conexiune API oficial legislatie.just.ro + căutare și extragere articol

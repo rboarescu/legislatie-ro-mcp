@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <title>Legislație RO — Ancorare AI</title>
+  <style>
+    body {
+      width: 380px;
+      margin: 0;
+      padding: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+    h3 {
+      margin: 0 0 4px 0;
+      font-size: 15px;
+      color: #1e3a8a;
+    }
+    .sub {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+    .row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font-size: 13px;
+    }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #out {
+      max-height: 320px;
+      overflow-y: auto;
+      font-size: 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    .copy-btn {
+      width: 100%;
+      margin-top: 8px;
+      background: #15803d;
+    }
+  </style>
+</head>
+<body>
+  <h3>🇷🇴 Legislație RO (legislatie.just.ro)</h3>
+  <div class="sub">Căutare rapidă în forma consolidată la zi pentru ancorare AI</div>
+  <div class="row">
+    <input id="q" type="text" placeholder="Ex: Legea 114/1996 art 39" />
+    <button id="go">Caută</button>
+  </div>
+  <div id="out">Introduceți legea și articolul (ex: <b>Legea 554/2004 art 11</b> sau <b>OUG 57/2019 art 292</b>).</div>
+  <button id="copy" class="copy-btn" style="display:none;">📋 Copiază pentru Prompt AI</button>
+  <script src="popup.js"></script>
+</body>
+</html>
