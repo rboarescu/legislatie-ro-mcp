@@ -1,0 +1,10 @@
+{
+  // Configurare Cloudflare Workers (Workers Builds din GitHub foloseste acest fisier).
+  // "name" trebuie sa fie identic cu "Project name" din dashboard-ul Cloudflare.
+  // Secretul ACCESS_TOKEN NU se pune aici: se seteaza din Settings -> Variables and Secrets.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "legislatie-ro-mcp",
+  "main": "cloudflare-worker.js",
+  "compatibility_date": "2025-09-01",
+  "workers_dev": true
+}
