@@ -50,14 +50,19 @@ CACHE_DIR = Path(
 )
 CACHE_DB_PATH = CACHE_DIR / "cache.sqlite"
 
-# Rate-limiting politicos fata de serverul Ministerului Justitiei
-MIN_REQUEST_INTERVAL_SEC = 0.8
+# Rate-limiting politicos si plafoane de siguranta fata de serverul Ministerului Justitiei
+MIN_REQUEST_INTERVAL_SEC = 1.0
+MAX_REQUESTS_PER_MINUTE = 20
+MAX_REQUESTS_PER_HOUR = 300
 
 DISCLAIMER_LEGAL = (
-    "Sursa: Portalul Legislativ Oficial al Romaniei (legislatie.just.ro — Ministerul Justitiei). "
-    "Acest conector returneaza exclusiv texte legislative publice si nu reprezinta consultanta juridica "
-    "(Legea nr. 51/1995). Conform Legii nr. 202/1998, singura forma cu efecte juridice oficiale este "
-    "cea publicata in Monitorul Oficial al Romaniei."
+    "Sursa: Portalul Legislativ N-Lex (legislatie.just.ro — Ministerul Justitiei). "
+    "Conform Termenilor si Conditiilor portalului (https://legislatie.just.ro/Public/Termeni) "
+    "si art. 9 lit. b) din Legea nr. 8/1996, textele oficiale de natura legislativa nu beneficiaza "
+    "de protectia dreptului de autor si pot fi reutilizate, insa versiunile consolidate au caracter "
+    "strict informativ/consultativ. Singura baza legala autentica la care se poate face referire "
+    "in documentele oficiale este textul publicat in Monitorul Oficial al Romaniei (Legea nr. 202/1998). "
+    "Acest conector tehnic nu ofera consultanta juridica (Legea nr. 51/1995)."
 )
 
 # Aliasuri uzuale pentru ca omul de rand sau LLM-ul sa poata scrie direct "Codul Muncii", "Codul Administrativ" etc.
@@ -443,12 +448,31 @@ class LegislatieJustRoClient:
     def __init__(self, cache: LocalLegisCache) -> None:
         self.cache = cache
         self._last_call_ts = 0.0
+        self._call_timestamps: list[float] = []
 
     def _throttle(self) -> None:
+        now = time.time()
+        # Curatam apelurile mai vechi de 1 ora
+        self._call_timestamps = [t for t in self._call_timestamps if (now - t) < 3600.0]
+
+        if len(self._call_timestamps) >= MAX_REQUESTS_PER_HOUR:
+            raise RuntimeError(
+                f"Limita de siguranta atinsa ({MAX_REQUESTS_PER_HOUR} interogari externe/ora catre legislatie.just.ro). "
+                "Interogarile din cache-ul local SQLite continua sa functioneze normal."
+            )
+
+        calls_last_min = [t for t in self._call_timestamps if (now - t) < 60.0]
+        if len(calls_last_min) >= MAX_REQUESTS_PER_MINUTE:
+            wait_sec = max(1.0, 60.0 - (now - calls_last_min[0]))
+            time.sleep(min(wait_sec, 10.0))
+
         elapsed = time.time() - self._last_call_ts
         if elapsed < MIN_REQUEST_INTERVAL_SEC:
             time.sleep(MIN_REQUEST_INTERVAL_SEC - elapsed)
-        self._last_call_ts = time.time()
+
+        ts = time.time()
+        self._last_call_ts = ts
+        self._call_timestamps.append(ts)
 
     def _soap_post(self, soap_action: str, body_xml: str, timeout: float = 20.0) -> bytes:
         self._throttle()
@@ -462,8 +486,13 @@ class LegislatieJustRoClient:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read()
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as err:
+            if err.code in (429, 502, 503, 504):
+                time.sleep(3.0)
+            raise
 
     def get_token(self, force_refresh: bool = False) -> str:
         if not force_refresh:
