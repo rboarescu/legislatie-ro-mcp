@@ -45,7 +45,7 @@ Proiectat pentru a ancora modelele AI (Claude, ChatGPT, Gemini, Cursor, Antigrav
 ## ⚙️ Instalare „One-Click” (3 Moduri)
 
 ### Modul 1: Extensie de Browser (Pentru utilizatorii de rând în Gemini / ChatGPT / Claude Web — Fără Python!)
-Directorul **[`browser-extension/`](browser-extension)** (și arhiva gata împachetată `dist/legislatie-ro-browser-extension.zip`) conține o extensie Chrome / Edge / Brave / Firefox (Manifest V3) care **rulează 100% în browserul utilizatorului**, fără Python și fără niciun server intermediar:
+Directorul **[`browser-extension/`](./browser-extension)** (și arhiva gata împachetată `dist/legislatie-ro-browser-extension.zip`) conține o extensie Chrome / Edge / Brave / Firefox (Manifest V3) care **rulează 100% în browserul utilizatorului**, fără Python și fără niciun server intermediar:
 - Injectează automat butonul plutitor **`⚖️ Legislație RO`** direct peste `gemini.google.com`, `chatgpt.com` și `claude.ai`.
 - Are buton de **„🔍 Detectează legile din conversație”** (scanează pagina după `Legea X/Y`, `OUG X/Y`, `HG X/Y`, `Art. Z` și creează butoane rapide).
 - Interoghează direct API-ul SOAP oficial `legislatie.just.ro/apiws` din browserul utilizatorului (cu cache local în `chrome.storage.local` și rate-limiting de 1 req/sec) și **inserează cu 1 click textul oficial la zi direct în căsuța de prompt a AI-ului**.
