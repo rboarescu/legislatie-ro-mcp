@@ -150,8 +150,10 @@ function decodeXml(s) {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)));
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&amp;/g, "&");
 }
 
 function extractTag(xml, tag) {
@@ -176,32 +178,123 @@ function cleanText(raw) {
     .trim();
 }
 
+// Marcaje interne pentru tipul fiecarei linii din articol (vezi parse_articles_from_consolidated_html din server.py)
+const MARK_NOTE = "\u0001"; // .S_NTA_TTL / .S_NTA_PAR (Nota: Decizii CCR, RIL/HP ICCJ)
+const MARK_PAR = "\u0002"; // .S_PAR (denumirea marginala sau nota de modificare "(la dd-mm-yyyy, ...)")
+
+function splitArticleLines(buffer) {
+  const body = [];
+  const notes = [];
+  let inNote = false;
+  for (const rawLine of buffer.split("\n")) {
+    const first = rawLine.replace(/^ +/, "")[0];
+    const mark = first === MARK_NOTE || first === MARK_PAR ? first : "";
+    const line = rawLine
+      .replace(/[\u0001\u0002]/g, "")
+      .replace(/ {2,}/g, " ")
+      .trim()
+      .replace(/ +([,;.)])/g, "$1");
+    if (!line) continue;
+    if (mark === MARK_NOTE) {
+      if (/^not[aă](?:[\s:]|$)/i.test(line) || !inNote) {
+        notes.push(line.replace(/:$/, "") + ":");
+      } else {
+        notes[notes.length - 1] += (notes[notes.length - 1].endsWith(":") ? " " : "\n") + line;
+      }
+      inNote = true;
+      continue;
+    }
+    inNote = false;
+    if (mark === MARK_PAR && /^\(la \d{2}-\d{2}-\d{4}/.test(line)) notes.push(line);
+    else body.push(line);
+  }
+  return { content: body.join("\n"), notes };
+}
+
+// Parcurge tag-urile cu o stiva: fiecare .S_ART de nivel superior este un articol; elementele
+// `display: block` devin linii; notele (.S_PAR "(la ...)" si .S_NTA) sunt extrase separat;
+// duplicatele ascunse (*_SHORT, TAG_COLLAPSED, display: none) sunt ignorate.
 function parseArticlesFromConsolidatedHtml(rawHtml) {
   if (!rawHtml || !rawHtml.includes("S_ART_TTL")) return [];
-  const artRe = /<span\s+class="S_ART_TTL"[^>]*>([\s\S]*?)<\/span>/gi;
-  const matches = [];
+  const tokenRe = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>|[^<]+|</g;
+  const articles = [];
+  const stack = [];
+  let hiddenDepth = 0;
+  let artDepth = -1;
+  let buf = [];
+  let label = [];
+  let inArtTtl = false;
   let m;
-  while ((m = artRe.exec(rawHtml)) !== null) {
-    const label = cleanText(m[1]);
-    const numM = label.match(/^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b/i);
-    matches.push({
-      start: m.index,
-      label,
-      num: numM ? numM[1].toLowerCase() : String(matches.length + 1)
-    });
+  while ((m = tokenRe.exec(rawHtml)) !== null) {
+    const tok = m[0];
+    if (tok.startsWith("<!--")) continue;
+    const tag = (m[2] || "").toLowerCase();
+    if (!tag) {
+      if (hiddenDepth || tok === "<" || artDepth < 0) continue;
+      const text = decodeXml(tok).replace(/\s+/g, " ");
+      buf.push(text);
+      if (inArtTtl) label.push(text);
+      continue;
+    }
+    if (tag === "br") {
+      if (artDepth >= 0 && !hiddenDepth) buf.push("\n");
+      continue;
+    }
+    if (tag !== "span") {
+      if (["div", "p", "li", "tr"].includes(tag) && artDepth >= 0 && !hiddenDepth) buf.push("\n");
+      continue;
+    }
+    if (m[1] !== "/") {
+      const attrs = m[3] || "";
+      const cm = attrs.match(/class="([^"]*)"/);
+      const cls = cm ? cm[1] : "";
+      const compact = attrs.replace(/ /g, "").toLowerCase();
+      const hidden = compact.includes("display:none") || cls.endsWith("_SHORT") || cls === "TAG_COLLAPSED";
+      const block = compact.includes("display:block");
+      stack.push({ cls, block, hidden });
+      if (hidden) {
+        hiddenDepth++;
+        continue;
+      }
+      if (hiddenDepth) continue;
+      if (cls === "S_ART" && artDepth < 0) {
+        artDepth = stack.length;
+        buf = [];
+        label = [];
+        continue;
+      }
+      if (artDepth >= 0) {
+        if (cls === "S_ART_TTL") inArtTtl = true;
+        if (cls === "S_NTA_TTL" || cls === "S_NTA_PAR") buf.push("\n" + MARK_NOTE);
+        else if (cls === "S_PAR") buf.push("\n" + MARK_PAR);
+        else if (block) buf.push("\n");
+      }
+      continue;
+    }
+    const top = stack.pop();
+    if (!top) continue;
+    if (top.hidden) {
+      hiddenDepth--;
+      continue;
+    }
+    if (hiddenDepth || artDepth < 0) continue;
+    if (stack.length < artDepth) {
+      const lbl = label.join("").replace(/\s+/g, " ").trim();
+      const numM = lbl.match(/^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b/i);
+      const { content, notes } = splitArticleLines(buf.join(""));
+      articles.push({
+        num: numM ? numM[1].toLowerCase() : String(articles.length + 1),
+        label: lbl,
+        content,
+        notes: notes.length ? notes : null
+      });
+      artDepth = -1;
+      continue;
+    }
+    if (top.cls === "S_ART_TTL") inArtTtl = false;
+    if (top.block || top.cls === "S_NTA_TTL" || top.cls === "S_ART_TTL") buf.push("\n");
   }
-  return matches.map((it, i) => {
-    const end = i + 1 < matches.length ? matches[i + 1].start : rawHtml.length;
-    const block = rawHtml.slice(it.start, end);
-    const content = cleanText(block);
-    const notes = content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => /(\(la\s+[0-9]{2}-[0-9]{2}-[0-9]{4}|Notă|Nota|Decizia\s+(?:ÎCCJ|ICCJ|CCR)|Recurs\s+în\s+interesul\s+legii|Hotărâre\s+prealabilă|HP\s+nr\.)/i.test(l))
-      .slice(0, 10)
-      .join("\n");
-    return { num: it.num, label: it.label, content, notes: notes || null };
-  });
+  return articles;
 }
 
 function splitArticlesPlain(text) {

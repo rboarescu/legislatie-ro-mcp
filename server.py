@@ -121,6 +121,17 @@ def strip_diacritics_lower(text: str) -> str:
     return out.lower().strip()
 
 
+def decode_notes(raw: str | None) -> list[str] | None:
+    """Notele sunt salvate ca lista JSON; intoarce None cand articolul nu are note."""
+    if not raw:
+        return None
+    try:
+        notes = json.loads(raw)
+    except json.JSONDecodeError:
+        return [raw]
+    return notes or None
+
+
 # ============================================================================
 # Smart Cache Local SQLite (cu FTS5 pentru cautare instantanee in articole)
 # ============================================================================
@@ -133,7 +144,14 @@ class LocalLegisCache:
         self.conn.row_factory = sqlite3.Row
         self._init_schema()
 
+    SCHEMA_VERSION = 2
+
     def _init_schema(self) -> None:
+        # v2: notele sunt liste JSON si articolele au `source`; reconstruim tabela de articole o singura data
+        if self.conn.execute("PRAGMA user_version").fetchone()[0] < self.SCHEMA_VERSION:
+            with self.conn:
+                self.conn.execute("DROP TABLE IF EXISTS articles")
+            self.conn.execute(f"PRAGMA user_version = {self.SCHEMA_VERSION}")
         with self.conn:
             self.conn.executescript(
                 """
@@ -171,6 +189,7 @@ class LocalLegisCache:
                     section_path TEXT,
                     content TEXT NOT NULL,
                     notes TEXT,
+                    source TEXT NOT NULL DEFAULT 'soap',
                     ord_index INTEGER NOT NULL,
                     UNIQUE(act_key, art_num, ord_index)
                 );
@@ -272,7 +291,12 @@ class LocalLegisCache:
                 ),
             )
 
-            if raw_text:
+            # Nu suprascriem forma consolidata (cu note) cu textul brut din SOAP
+            has_consolidated = self.conn.execute(
+                "SELECT 1 FROM articles WHERE act_key = ? AND source = 'consolidated' LIMIT 1",
+                (act_key,),
+            ).fetchone()
+            if raw_text and not has_consolidated:
                 parsed_articles = parse_articles_from_text(raw_text)
                 if parsed_articles:
                     self.conn.execute("DELETE FROM articles WHERE act_key = ?", (act_key,))
@@ -288,7 +312,7 @@ class LocalLegisCache:
                                 a["art_label"],
                                 a["section_path"],
                                 a["content"],
-                                a["notes"],
+                                json.dumps(a["notes"], ensure_ascii=False),
                                 idx,
                             )
                             for idx, a in enumerate(parsed_articles)
@@ -337,77 +361,172 @@ def clean_soap_text(raw_text: str) -> str:
     return txt.strip()
 
 
-def parse_articles_from_consolidated_html(raw_html: str) -> list[dict[str, str]]:
+HTML_TOKEN_RE = re.compile(r"<!--[\s\S]*?-->|<(/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>|[^<]+|<")
+CLASS_ATTR_RE = re.compile(r'class="([^"]*)"')
+STRUCT_HEADING_RE = re.compile(r"^S_(PRT|CRT|TTL|CAP|SEC|SSEC|ANX)_(TTL|DEN)$")
+STRUCT_LEVELS = ["PRT", "CRT", "TTL", "CAP", "SEC", "SSEC"]
+AMENDMENT_NOTE_RE = re.compile(r"^\(la \d{2}-\d{2}-\d{4}")
+
+# Marcaje interne pentru tipul fiecarei linii din articol
+_MARK_NOTE = "\x01"  # .S_NTA_TTL / .S_NTA_PAR (Nota: Decizii CCR, RIL/HP ICCJ)
+_MARK_PAR = "\x02"  # .S_PAR (denumirea marginala sau nota de modificare "(la dd-mm-yyyy, ...)")
+
+
+def _split_article_lines(buffer: str) -> tuple[str, list[str]]:
+    """Separa textul legii de note: notele de modificare `(la ...)` si blocurile `Notă` devin intrari separate."""
+    body: list[str] = []
+    notes: list[str] = []
+    in_note = False
+    for raw_line in buffer.split("\n"):
+        stripped = raw_line.lstrip(" ")
+        mark = stripped[:1] if stripped[:1] in (_MARK_NOTE, _MARK_PAR) else ""
+        line = re.sub(r"[\x01\x02]", "", raw_line)
+        line = re.sub(r" {2,}", " ", line).strip()
+        line = re.sub(r" +([,;.)])", r"\1", line)
+        if not line:
+            continue
+        if mark == _MARK_NOTE:
+            if re.match(r"(?i)^not[aă](?:[\s:]|$)", line) or not in_note:
+                notes.append(line.rstrip(":") + ":")
+            else:
+                notes[-1] += ("\n" if not notes[-1].endswith(":") else " ") + line
+            in_note = True
+            continue
+        in_note = False
+        if mark == _MARK_PAR and AMENDMENT_NOTE_RE.match(line):
+            notes.append(line)
+        else:
+            body.append(line)
+    return "\n".join(body), notes
+
+
+def parse_articles_from_consolidated_html(raw_html: str) -> list[dict[str, Any]]:
     """
-    Parseaza direct clasele oficiale CTCE din pagina `LinkHtml` (DetaliiDocument/{id}):
-    - `.S_ART_TTL` + `.S_ART_BDY` (textul consolidat la zi al articolului, cu toate modificarile integrate!)
-    - `.S_NTA` si `.S_PAR` (notele de modificare, Deciziile CCR si RIL/HP ICCJ atasate direct sub alineat!)
+    Parseaza structura oficiala CTCE din pagina `LinkHtml` (DetaliiDocument/{id}):
+    - fiecare `.S_ART` de nivel superior este un articol (textul consolidat la zi, cu modificarile integrate);
+    - elementele `display: block` (alineate, litere, puncte) devin linii separate;
+    - `.S_PAR` "(la dd-mm-yyyy, ...)" si `.S_NTA` (Decizii CCR, RIL/HP ICCJ) sunt extrase separat in `notes`;
+    - duplicatele ascunse (`*_SHORT`, `TAG_COLLAPSED`, `display: none`) sunt ignorate.
     """
     if not raw_html or "S_ART_TTL" not in raw_html:
         return []
 
-    # Colectam pozitiile titlurilor/capitolelor
-    struct_re = re.compile(
-        r'<span\s+class="S_(?:TTL|CAP|SEC|PRT|CRT)_TTL"[^>]*>([\s\S]*?)</span>',
-        flags=re.IGNORECASE,
-    )
-    struct_positions: list[tuple[int, str]] = [
-        (m.start(), clean_soap_text(m.group(1))) for m in struct_re.finditer(raw_html)
-    ]
+    articles: list[dict[str, Any]] = []
+    # Stiva de span-uri deschise: (clasa, este_bloc, este_ascuns)
+    stack: list[tuple[str, bool, bool]] = []
+    hidden_depth = 0
+    art_depth = -1  # adancimea stivei la care s-a deschis articolul curent
+    art_buf: list[str] = []
+    art_label: list[str] = []
+    art_section = ""
+    levels: dict[str, str] = {}
+    heading_cls = ""
+    heading_buf: list[str] = []
+    in_art_ttl = False
 
-    def get_section_at(pos: int) -> str:
-        recent = [label for p, label in struct_positions if p < pos and label]
-        return " > ".join(recent[-2:]) if recent else "Dispoziții generale"
+    def section_path() -> str:
+        parts = [levels[lvl] for lvl in STRUCT_LEVELS if levels.get(lvl)]
+        return " > ".join(parts) if parts else "Dispoziții generale"
 
-    art_ttl_re = re.compile(
-        r'<span\s+class="S_ART_TTL"[^>]*>([\s\S]*?)</span>',
-        flags=re.IGNORECASE,
-    )
-    matches = list(art_ttl_re.finditer(raw_html))
-    if not matches:
-        return []
+    for m in HTML_TOKEN_RE.finditer(raw_html):
+        tok = m.group(0)
+        if tok.startswith("<!--"):
+            continue
+        tag = (m.group(2) or "").lower()
+        if not tag:
+            if hidden_depth or tok == "<":
+                continue
+            text = re.sub(r"\s+", " ", html.unescape(tok))
+            if art_depth >= 0:
+                art_buf.append(text)
+                if in_art_ttl:
+                    art_label.append(text)
+            elif heading_cls:
+                heading_buf.append(text)
+            continue
 
-    note_span_re = re.compile(
-        r'<span\s+class="S_(?:NTA|PAR)"[^>]*>([\s\S]*?)</span>',
-        flags=re.IGNORECASE,
-    )
+        closing = m.group(1) == "/"
+        attrs = m.group(3) or ""
+        if tag == "br":
+            if art_depth >= 0 and not hidden_depth:
+                art_buf.append("\n")
+            continue
+        if tag != "span":
+            if tag in ("div", "p", "li", "tr") and art_depth >= 0 and not hidden_depth:
+                art_buf.append("\n")
+            continue
 
-    articles: list[dict[str, str]] = []
-    for i, m in enumerate(matches):
-        start = m.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(raw_html)
-        block_html = raw_html[start:end]
+        if not closing:
+            cm = CLASS_ATTR_RE.search(attrs)
+            cls = cm.group(1) if cm else ""
+            compact = attrs.replace(" ", "").lower()
+            hidden = "display:none" in compact or cls.endswith("_SHORT") or cls == "TAG_COLLAPSED"
+            block = "display:block" in compact
+            stack.append((cls, block, hidden))
+            if hidden:
+                hidden_depth += 1
+                continue
+            if hidden_depth:
+                continue
+            if cls == "S_ART" and art_depth < 0:
+                art_depth = len(stack)
+                art_buf, art_label, art_section = [], [], section_path()
+                continue
+            if art_depth >= 0:
+                if cls == "S_ART_TTL":
+                    in_art_ttl = True
+                if cls in ("S_NTA_TTL", "S_NTA_PAR"):
+                    art_buf.append("\n" + _MARK_NOTE)
+                elif cls == "S_PAR":
+                    art_buf.append("\n" + _MARK_PAR)
+                elif block:
+                    art_buf.append("\n")
+            else:
+                hm = STRUCT_HEADING_RE.match(cls)
+                if hm:
+                    heading_cls, heading_buf = cls, []
+            continue
 
-        # Taiem la inceputul urmatorului Capitol/Titlu/Subsol daca se afla in interiorul blocului
-        next_structs = [p for p, _ in struct_positions if start < p < end]
-        if next_structs:
-            block_html = raw_html[start : next_structs[0]]
-
-        art_label = clean_soap_text(m.group(1))
-        num_m = re.search(
-            r"(?i)^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b",
-            art_label.strip(),
-        )
-        art_num = num_m.group(1).lower() if num_m else str(i + 1)
-
-        content_clean = clean_soap_text(block_html)
-        notes_found = [
-            line.strip()
-            for line in content_clean.splitlines()
-            if re.search(
-                r"(?i)(\(la\s+[0-9]{2}-[0-9]{2}-[0-9]{4}|Notă|Nota|Decizia\s+(?:ÎCCJ|ICCJ|CCR)|Recurs\s+în\s+interesul\s+legii|Hotărâre\s+prealabilă|neconstituțional)",
-                line,
+        # Tag de inchidere </span>
+        if not stack:
+            continue
+        cls, block, hidden = stack.pop()
+        if hidden:
+            hidden_depth -= 1
+            continue
+        if hidden_depth:
+            continue
+        if art_depth >= 0 and len(stack) < art_depth:
+            label = re.sub(r"\s+", " ", "".join(art_label)).strip()
+            num_m = re.search(r"(?i)^(?:articolul|art\.?)\s*([0-9]+(?:\^[0-9]+)?|[IVXLCDM]+)\b", label)
+            content, notes = _split_article_lines("".join(art_buf))
+            articles.append(
+                {
+                    "art_num": num_m.group(1).lower() if num_m else str(len(articles) + 1),
+                    "art_label": label,
+                    "section_path": art_section,
+                    "content": content,
+                    "notes": notes,
+                }
             )
-        ]
-        articles.append(
-            {
-                "art_num": art_num,
-                "art_label": art_label,
-                "section_path": get_section_at(start),
-                "content": content_clean,
-                "notes": "\n".join(notes_found[:12]),
-            }
-        )
+            art_depth = -1
+            continue
+        if art_depth >= 0:
+            if cls == "S_ART_TTL":
+                in_art_ttl = False
+            if block or cls in ("S_NTA_TTL", "S_ART_TTL"):
+                art_buf.append("\n")
+        elif heading_cls and cls == heading_cls:
+            hm = STRUCT_HEADING_RE.match(cls)
+            text = re.sub(r"\s+", " ", "".join(heading_buf)).strip()
+            lvl = "PRT" if hm.group(1) == "ANX" else hm.group(1)
+            if hm.group(2) == "TTL":
+                levels[lvl] = text
+                for deeper in STRUCT_LEVELS[STRUCT_LEVELS.index(lvl) + 1 :]:
+                    levels.pop(deeper, None)
+            elif text and levels.get(lvl):
+                levels[lvl] += f" – {text}"
+            heading_cls = ""
 
     return articles
 
@@ -434,7 +553,7 @@ def parse_articles_from_text(raw_text: str) -> list[dict[str, str]]:
                 "art_label": "Textul actului",
                 "section_path": "Text integral",
                 "content": text[:15000],
-                "notes": "\n".join(NOTE_LINE_RE.findall(text)[:10]),
+                "notes": NOTE_LINE_RE.findall(text)[:10],
             }
         ]
 
@@ -450,7 +569,7 @@ def parse_articles_from_text(raw_text: str) -> list[dict[str, str]]:
                 "art_label": "Preambul / Emitent / Temei",
                 "section_path": "Preambul",
                 "content": preambul[:6000],
-                "notes": "\n".join(NOTE_LINE_RE.findall(preambul)),
+                "notes": NOTE_LINE_RE.findall(preambul),
             }
         )
 
@@ -474,7 +593,7 @@ def parse_articles_from_text(raw_text: str) -> list[dict[str, str]]:
                 "art_label": art_label,
                 "section_path": get_section_at(start),
                 "content": chunk,
-                "notes": "\n".join(notes_found),
+                "notes": notes_found,
             }
         )
 
@@ -962,7 +1081,7 @@ class LegislatieMCPTools:
             return
 
         cur = self.cache.conn.execute(
-            "SELECT COUNT(*) AS cnt FROM articles WHERE act_key = ? AND notes IS NOT NULL AND length(notes) > 0",
+            "SELECT COUNT(*) AS cnt FROM articles WHERE act_key = ? AND source = 'consolidated'",
             (act_key,),
         )
         row = cur.fetchone()
@@ -984,8 +1103,8 @@ class LegislatieMCPTools:
                     self.cache.conn.execute("DELETE FROM articles WHERE act_key = ?", (act_key,))
                     self.cache.conn.executemany(
                         """
-                        INSERT INTO articles (act_key, art_num, art_label, section_path, content, notes, ord_index)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO articles (act_key, art_num, art_label, section_path, content, notes, source, ord_index)
+                        VALUES (?, ?, ?, ?, ?, ?, 'consolidated', ?)
                         """,
                         [
                             (
@@ -994,7 +1113,7 @@ class LegislatieMCPTools:
                                 a["art_label"],
                                 a["section_path"],
                                 a["content"],
-                                a["notes"],
+                                json.dumps(a["notes"], ensure_ascii=False),
                                 idx,
                             )
                             for idx, a in enumerate(consolidated_arts)
@@ -1054,7 +1173,7 @@ class LegislatieMCPTools:
                     "este_articol_cerut_direct": r["art_num"].lower() in req_nums,
                     "sectiune_capitol": r["section_path"],
                     "text_oficial": r["content"],
-                    "note_modificari_ril_ccr": r["notes"] or None,
+                    "note_modificari_ril_ccr": decode_notes(r["notes"]),
                 }
             )
 
@@ -1084,7 +1203,7 @@ class LegislatieMCPTools:
                                 "este_articol_cerut_direct": True,
                                 "sectiune_capitol": r["section_path"],
                                 "text_oficial": r["content"],
-                                "note_modificari_ril_ccr": r["notes"] or None,
+                                "note_modificari_ril_ccr": decode_notes(r["notes"]),
                             }
                         )
 
@@ -1141,7 +1260,7 @@ class LegislatieMCPTools:
                 (act_key,),
             )
             for row in cur.fetchall():
-                norm_content = strip_diacritics_lower(row["content"])
+                norm_content = strip_diacritics_lower(f"{row['content']}\n{row['notes'] or ''}")
                 score = sum(norm_content.count(term) for term in query_terms if term in norm_content)
                 distinct_matched = sum(1 for term in query_terms if term in norm_content)
                 if distinct_matched > 0:
@@ -1161,7 +1280,7 @@ class LegislatieMCPTools:
                     "articol": row["art_label"],
                     "sectiune_capitol": row["section_path"],
                     "text_oficial": row["content"][:4000],
-                    "note_modificari_ril_ccr": row["notes"] or None,
+                    "note_modificari_ril_ccr": decode_notes(row["notes"]),
                 }
             )
 
