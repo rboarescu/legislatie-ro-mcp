@@ -86,6 +86,14 @@ Fiecare utilizator își rulează propria instanță pe contul său Cloudflare (
 
 Fără `ACCESS_TOKEN`, Worker-ul răspunde `503` tuturor. Pentru o instanță publică deliberată, setați variabila `PUBLIC_ACCESS=true` (atenție: oricine poate folosi atunci Worker-ul ca proxy către legislatie.just.ro).
 
+#### Exemplu: instrucțiune în Gemini (Personal context)
+
+În Gemini, conectorul este folosit doar când este invocat cu `@`. O instrucțiune care a funcționat, salvată în **Personal context** (înlocuiți `@Legal` cu numele dat conectorului):
+
+```
+For legal work, invoke the @Legal MCP and the tools provided by it for grounding in facts, to prevent stale or unofficial information that could result in misinterpretation.
+```
+
 ### Rulare din linia de comandă (Testare / CLI)
 
 ```bash
