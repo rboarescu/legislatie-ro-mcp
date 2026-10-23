@@ -7,6 +7,7 @@
 - Worker: statusul HTTP al paginii consolidate nu era verificat; o pagină de eroare sau de blocare era parsată ca act fără articole. Acum un răspuns non-2xx sau o pagină fără articole și fără trimitere `.S_REF` este eroare, cu statusul și începutul paginii primite în `avertisment`.
 - Actele din aliasuri (`doc_id`) nu aveau nici avertisment, nici text de rezervă. Acum, dacă forma consolidată eșuează, se folosește textul din API-ul SOAP (după număr și an), cu avertisment.
 - Fără niciun articol (nici consolidat, nici SOAP), răspunsul este `eroare` cu `isError: true` în loc de un act „gol”; modelul primește instrucțiunea să spună că sursa nu e disponibilă, nu să răspundă din memorie.
+- Worker, API-ul SOAP: statusul HTTP și `<s:Fault>` nu erau verificate, iar tokenul nu era reînnoit (durata lui de valabilitate nu este documentată). Un token expirat sau o eroare a serviciului apăreau ca „Nu s-au găsit acte”. Acum, la eroare sau rezultat gol cu un token mai vechi de un minut, se reîncearcă o dată cu token nou (ca în `server.py`); dacă serviciul tot nu răspunde, rezultatul este `eroare` cu mesajul serviciului și `isError: true`.
 - `server.py`: aceeași rezervă SOAP pentru aliasuri, începutul paginii primite în avertisment, `eroare` + `isError: true` în `extrage_articole_din_act`, `cauta_in_interiorul_actului` și `exploreaza_cuprinsul_actului` când nu există text.
 
 ## 2026-10-22

@@ -403,18 +403,33 @@ function splitArticlesPlain(text) {
   }));
 }
 
+// Arunca eroare la HTTP != 2xx sau la un SOAP Fault (serviciul WCF raspunde cu 500 + <s:Fault>)
+async function soapPost(action, body) {
+  const r = await fetch(SOAP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"${action}"` },
+    body
+  });
+  const xml = await r.text();
+  const fault = extractTag(xml, "faultstring");
+  if (!r.ok || fault) {
+    const op = action.split("/").pop();
+    throw new Error(`SOAP ${op}: HTTP ${r.status}${fault ? `, fault: '${cleanText(fault).slice(0, 200)}'` : ` (${pageSnippet(xml)})`}`);
+  }
+  return xml;
+}
+
 async function getSoapToken(force = false) {
   if (!force && cachedToken && Date.now() - cachedTokenTs < 15 * 60 * 1000) {
     return cachedToken;
   }
-  const env = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetToken xmlns="http://tempuri.org/" /></s:Body></s:Envelope>`;
-  const r = await fetch(SOAP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"${SOAP_ACTION_TOKEN}"` },
-    body: env
-  });
-  const xml = await r.text();
-  cachedToken = extractTag(xml, "GetTokenResult");
+  const xml = await soapPost(
+    SOAP_ACTION_TOKEN,
+    `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><GetToken xmlns="http://tempuri.org/" /></s:Body></s:Envelope>`
+  );
+  const token = extractTag(xml, "GetTokenResult");
+  if (!token) throw new Error(`SOAP GetToken: raspuns fara token (${pageSnippet(xml)})`);
+  cachedToken = token;
   cachedTokenTs = Date.now();
   return cachedToken;
 }
@@ -430,8 +445,22 @@ function soapSearch(params, cc) {
   return cached(`cautare:${JSON.stringify([an, numar, text, titlu])}`, SEARCH_TTL_SEC, cc, () => soapSearchRaw(params), (items) => items.length > 0);
 }
 
-async function soapSearchRaw({ an = "", numar = "", text = "", titlu = "", perPage = 15 }) {
-  const token = await getSoapToken(false);
+// Durata de valabilitate a tokenului nu este documentata: la eroare sau rezultat gol, reincercam o data cu token nou
+// (doar daca tokenul nu este deja proaspat, ca o cautare fara rezultate sa nu ceara mereu token nou)
+async function soapSearchRaw(params) {
+  for (let attempt = 0; ; attempt++) {
+    const token = await getSoapToken(attempt > 0);
+    const canRetry = attempt === 0 && Date.now() - cachedTokenTs > 60 * 1000;
+    try {
+      const items = await soapSearchOnce(params, token);
+      if (items.length || !canRetry) return items;
+    } catch (err) {
+      if (!canRetry) throw err;
+    }
+  }
+}
+
+async function soapSearchOnce({ an = "", numar = "", text = "", titlu = "", perPage = 15 }, token) {
   const env = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
     <Search xmlns="http://tempuri.org/">
@@ -447,12 +476,7 @@ async function soapSearchRaw({ an = "", numar = "", text = "", titlu = "", perPa
     </Search>
   </s:Body>
 </s:Envelope>`;
-  const r = await fetch(SOAP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"${SOAP_ACTION_SEARCH}"` },
-    body: env
-  });
-  const xml = await r.text();
+  const xml = await soapPost(SOAP_ACTION_SEARCH, env);
   const blocks = xml.match(/<(?:[a-zA-Z0-9_]+:)?Legi\b[^>]*>[\s\S]*?<\/(?:[a-zA-Z0-9_]+:)?Legi>/gi) || [];
   return blocks.map((b) => ({
     tip_act: extractTag(b, "TipAct"),
@@ -685,6 +709,22 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
     }
   }
   if (!best) {
+    let soapError = null;
+    const search = async (params) => {
+      try {
+        return await soapSearch(params, cc);
+      } catch (err) {
+        soapError = err.message || String(err);
+        return [];
+      }
+    };
+    const soapFailure = () => ({
+      eroare:
+        `API-ul SOAP legislatie.just.ro nu a raspuns (${soapError}). Reincearca mai tarziu; ` +
+        "spune utilizatorului ca sursa oficiala nu este disponibila acum si NU raspunde din memorie.",
+      ...(avertisment ? { avertisment } : {}),
+      disclaimer: DISCLAIMER_LEGAL
+    });
     const filterItems = (items) => {
       if (resolved.tip_act && items.length) {
         const exp = stripDiacriticsLower(resolved.tip_act);
@@ -708,12 +748,13 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
       const tries = cuvinte_cheie ? [cuvinte_cheie, ...(words.length > 1 ? words.slice(0, 3) : [])] : [];
       const seen = new Map();
       for (const text of tries) {
-        for (const x of await soapSearch({ numar: resolved.numar, text }, cc)) {
+        for (const x of await search({ numar: resolved.numar, text })) {
           if (x.numar === resolved.numar && (!exp || stripDiacriticsLower(x.tip_act) === exp)) seen.set(x.link_oficial, x);
         }
         if (seen.size) break;
       }
       items = [...seen.values()];
+      if (!items.length && soapError) return soapFailure();
       if (items.length !== 1) {
         return {
           ambiguu: true,
@@ -735,7 +776,7 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
       const words = cuvinte_cheie.split(/\s+/).filter((t) => t.length >= 3 && !STOPWORDS.has(stripDiacriticsLower(t)));
       const tries = [cuvinte_cheie.trim(), ...words.slice(0, 4).map((w, i) => (words[i + 1] ? `${w} ${words[i + 1]}` : "")).filter(Boolean)];
       for (const text of [...new Set(tries)]) {
-        items = await soapSearch({ text }, cc);
+        items = await search({ text });
         if (items.length) break;
       }
       if (items.length > 1) {
@@ -756,14 +797,15 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
       }
     } else {
       items = filterItems(
-        await soapSearch({
+        await search({
           an: resolved.an,
           numar: resolved.numar,
           titlu: !resolved.numar && !resolved.an ? resolved.titlu : "",
           text: !act ? cuvinte_cheie : ""
-        }, cc)
+        })
       );
     }
+    if (!items.length && soapError) return soapFailure();
     if (!items.length) {
       return {
         eroare: `Nu s-au gasit acte normative pentru '${act}' / '${cuvinte_cheie}'.`,
