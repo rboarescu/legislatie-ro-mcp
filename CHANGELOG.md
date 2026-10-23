@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-23
+
+### Eșecuri vizibile la preluarea textului (Worker + `server.py`)
+- Test „locuința socială” în Gemini: Legea 114/1996 și Codul administrativ au întors `numar_articole_in_act: 0` fără niciun avertisment, iar modelul a răspuns din memorie (inclusiv un „art. 292^3 introdus prin OUG 91/2023” necitat din nicio sursă).
+- Worker: statusul HTTP al paginii consolidate nu era verificat; o pagină de eroare sau de blocare era parsată ca act fără articole. Acum un răspuns non-2xx sau o pagină fără articole și fără trimitere `.S_REF` este eroare, cu statusul și începutul paginii primite în `avertisment`.
+- Actele din aliasuri (`doc_id`) nu aveau nici avertisment, nici text de rezervă. Acum, dacă forma consolidată eșuează, se folosește textul din API-ul SOAP (după număr și an), cu avertisment.
+- Fără niciun articol (nici consolidat, nici SOAP), răspunsul este `eroare` cu `isError: true` în loc de un act „gol”; modelul primește instrucțiunea să spună că sursa nu e disponibilă, nu să răspundă din memorie.
+- `server.py`: aceeași rezervă SOAP pentru aliasuri, începutul paginii primite în avertisment, `eroare` + `isError: true` în `extrage_articole_din_act`, `cauta_in_interiorul_actului` și `exploreaza_cuprinsul_actului` când nu există text.
+
 ## 2026-10-22
 
 ### Cloudflare Worker

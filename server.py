@@ -1033,6 +1033,21 @@ INSTRUCTIUNI_MODEL = (
 # Implementarea celor 5 Unelte MCP (Tools)
 # ============================================================================
 
+EROARE_FARA_TEXT = (
+    "Textul actului nu a putut fi obtinut de pe legislatie.just.ro (nici forma consolidata, nici textul din API-ul SOAP). "
+    "Spune utilizatorului ca sursa oficiala nu este disponibila acum; NU raspunde din memorie si NU cita articole."
+)
+
+
+def page_snippet(raw_html: str) -> str:
+    """Inceputul paginii primite (titlu + text), ca sa se vada ce a trimis portalul in locul actului."""
+    title_m = re.search(r"<title[^>]*>(.*?)</title>", raw_html, flags=re.IGNORECASE | re.DOTALL)
+    title = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", title_m.group(1)))).strip() if title_m else ""
+    body = re.sub(r"<(script|style)\b.*?</\1>", " ", raw_html, flags=re.IGNORECASE | re.DOTALL)
+    body = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body))).strip()
+    return f"{f'titlu: {title[:80]!r}, ' if title else ''}{len(raw_html)} caractere, inceput: {body[:160]!r}"
+
+
 class ActAmbiguu(Exception):
     """Actul nu poate fi identificat fara an; `response` este raspunsul de returnat modelului."""
 
@@ -1323,9 +1338,8 @@ class LegislatieMCPTools:
                 r'class="S_REF"><A href="[^"]*DetaliiDocumentAfis/(\d+)', raw_html, flags=re.IGNORECASE
             )
             if ref:
-                consolidated_arts = parse_articles_from_consolidated_html(
-                    fetch_html(f"https://legislatie.just.ro/Public/DetaliiDocument/{ref.group(1)}")
-                )
+                raw_html = fetch_html(f"https://legislatie.just.ro/Public/DetaliiDocument/{ref.group(1)}")
+                consolidated_arts = parse_articles_from_consolidated_html(raw_html)
             if consolidated_arts:
                 with self.cache.conn:
                     self.cache.conn.execute("DELETE FROM articles WHERE act_key = ?", (act_key,))
@@ -1347,14 +1361,38 @@ class LegislatieMCPTools:
                             for idx, a in enumerate(consolidated_arts)
                         ],
                     )
-            else:
-                return "Pagina consolidata nu contine articole; textul de mai jos (daca exista) provine din API-ul SOAP si poate sa nu fie la zi."
+                return None
+            problema = f"Pagina consolidata nu contine articole ({page_snippet(raw_html)})."
         except Exception as exc:
-            return (
-                f"Forma consolidata la zi nu a putut fi preluata ({exc.__class__.__name__}: {exc}). "
-                "Textul de mai jos (daca exista) provine din API-ul SOAP si poate sa nu fie la zi; reincearca mai tarziu."
-            )
-        return None
+            problema = f"Forma consolidata la zi nu a putut fi preluata ({exc.__class__.__name__}: {exc})."
+        self._soap_fallback(act_meta)
+        if self._act_rows(act_meta["act_key"]):
+            return f"{problema} Textul provine din API-ul SOAP si poate sa nu fie la zi; reincearca mai tarziu."
+        return problema
+
+    def _soap_fallback(self, act_meta: dict[str, Any]) -> None:
+        """
+        Actele cu `doc_id` din aliasuri nu au text SOAP; cand forma consolidata esueaza, cautam actul dupa numar si an.
+        Rezultatul pentru acelasi document se salveaza sub acelasi `act_key`; altfel `act_meta` trece pe actul gasit.
+        """
+        numar, an = act_meta.get("numar") or "", act_meta.get("data_vigoare") or ""
+        if self._act_rows(act_meta["act_key"]) or not (numar and re.fullmatch(r"(19|20)\d\d", an)):
+            return
+        try:
+            found = self.client.search(search_an=an, search_numar=numar, rezultate_pagina=25)
+        except Exception:
+            return
+        want_tip = strip_diacritics_lower(act_meta.get("tip_act", ""))
+        same = [
+            r
+            for r in found
+            if r.get("numar") == numar
+            and an in (r.get("titlu") or "")
+            and (want_tip in ("", "act normativ") or strip_diacritics_lower(r.get("tip_act", "")) == want_tip)
+            and self._act_rows(r["act_key"])
+        ]
+        if same and not any(r["act_key"] == act_meta["act_key"] for r in same):
+            act_meta.update(max(same, key=lambda x: len(x.get("text") or "")))
 
     def extrage_articole_din_act(
         self,
@@ -1450,6 +1488,14 @@ class LegislatieMCPTools:
                             }
                         )
 
+        if not all_rows and not extracted:
+            return {
+                "eroare": EROARE_FARA_TEXT,
+                "act": {"titlu": best.get("titlu"), "link_oficial": best.get("link_html")},
+                **({"avertisment": avertisment} if avertisment else {}),
+                "disclaimer": DISCLAIMER_LEGAL,
+            }
+
         found_nums = {e["numar_articol"].lower() for e in extracted}
         missing = [n for n in req_nums if n not in found_nums]
         result: dict[str, Any] = {
@@ -1524,6 +1570,12 @@ class LegislatieMCPTools:
             if warn := self._ensure_consolidated_articles(act_meta):
                 avertismente.append(f"{act_meta.get('titlu', '')[:80]}: {warn}")
             entries.extend((act_meta, row) for row in self._act_rows(act_meta["act_key"]))
+        if not entries:
+            return {
+                "eroare": EROARE_FARA_TEXT,
+                **({"avertisment": " | ".join(avertismente)} if avertismente else {}),
+                "disclaimer": DISCLAIMER_LEGAL,
+            }
 
         stems, ranked = rank_articles(
             [f"{row['content']}\n" + "\n".join(decode_notes(row["notes"]) or []) for _, row in entries],
@@ -1608,6 +1660,13 @@ class LegislatieMCPTools:
         else:
             # Fara structura consolidata (doar text SOAP): reconstruim din titlurile din text
             outline = extract_outline_from_text(best.get("text") or "")
+        if not outline and avertisment:
+            return {
+                "eroare": EROARE_FARA_TEXT,
+                "act": {"titlu": best.get("titlu"), "link_oficial": best.get("link_html")},
+                "avertisment": avertisment,
+                "disclaimer": DISCLAIMER_LEGAL,
+            }
         if filtru_sectiune:
             f_norm = strip_diacritics_lower(filtru_sectiune)
             outline = [
@@ -1956,7 +2015,7 @@ def handle_mcp_request(tools_impl: LegislatieMCPTools, msg: dict[str, Any]) -> d
                             "text": json.dumps(res, ensure_ascii=False, indent=2),
                         }
                     ],
-                    "isError": False,
+                    "isError": "eroare" in res,
                 },
             }
         except Exception as exc:

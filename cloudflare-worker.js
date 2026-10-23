@@ -383,6 +383,7 @@ function parseArticlesFromConsolidatedHtml(rawHtml) {
 }
 
 function splitArticlesPlain(text) {
+  if (!text.trim()) return [];
   const re = /(?:^|\n)(Articolul\s+((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+)|Art\.\s*((?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]+)(?:\^[0-9]+)?|[IVXLCDM]+))\b[.\s:-]*/gi;
   const matches = [];
   let m;
@@ -633,16 +634,32 @@ function fetchConsolidatedArticles(link, cc) {
   return cached(`act:${docId}`, DOC_TTL_SEC, cc, () => fetchConsolidatedArticlesRaw(link), (r) => r.arts.length > 0);
 }
 
+// Inceputul paginii primite (titlu + text), ca sa se vada in raspuns ce a trimis portalul in locul actului
+function pageSnippet(html) {
+  const title = cleanText((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "");
+  const body = cleanText(html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")).replace(/\s+/g, " ");
+  return `${title ? `titlu: '${title.slice(0, 80)}', ` : ""}${html.length} caractere, inceput: '${body.slice(0, 160)}'`;
+}
+
+// Arunca eroare cand pagina nu poate fi folosita (HTTP != 2xx sau o pagina fara articole si fara trimitere),
+// ca sa nu fie confundata cu un act fara articole
 async function fetchConsolidatedArticlesRaw(link) {
-  const get = (u) =>
-    fetch(u.replace(/^http:\/\//i, "https://"), { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } }).then((r) => r.text());
+  const get = async (u) => {
+    const r = await fetch(u.replace(/^http:\/\//i, "https://"), { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } });
+    const html = await r.text();
+    if (!r.ok) throw new Error(`HTTP ${r.status} pentru ${u} (${pageSnippet(html)})`);
+    return html;
+  };
   const rawHtml = await get(link);
   const arts = parseArticlesFromConsolidatedHtml(rawHtml);
   if (arts.length) return { arts, link };
   const ref = rawHtml.match(/class="S_REF"><A href="[^"]*DetaliiDocumentAfis\/(\d+)/i);
-  if (!ref) return { arts, link };
+  if (!ref) throw new Error(`pagina ${link} nu contine articole (${pageSnippet(rawHtml)})`);
   const refLink = `https://legislatie.just.ro/Public/DetaliiDocument/${ref[1]}`;
-  return { arts: parseArticlesFromConsolidatedHtml(await get(refLink)), link: refLink };
+  const refHtml = await get(refLink);
+  const refArts = parseArticlesFromConsolidatedHtml(refHtml);
+  if (!refArts.length) throw new Error(`pagina ${refLink} nu contine articole (${pageSnippet(refHtml)})`);
+  return { arts: refArts, link: refLink };
 }
 
 async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, cc = { ctx: null, stats: [] }) {
@@ -652,25 +669,22 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
   let avertisment = null;
 
   if (resolved.doc_id) {
-    let fetched;
     try {
-      fetched = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`, cc);
-    } catch (err) {
-      return {
-        eroare: `Forma consolidata la zi nu a putut fi preluata de pe legislatie.just.ro (${err}). Reincearca mai tarziu; nu raspunde din memorie.`,
-        disclaimer: DISCLAIMER_LEGAL
+      const { arts, link } = await fetchConsolidatedArticles(`https://legislatie.just.ro/Public/DetaliiDocument/${resolved.doc_id}`, cc);
+      allArts = arts;
+      best = {
+        tip_act: resolved.tip_act || "ACT NORMATIV",
+        numar: resolved.numar,
+        data_vigoare: resolved.an,
+        titlu: `${resolved.tip_act || "Act"} nr. ${resolved.numar}/${resolved.an} (${resolved.titlu})`,
+        link_oficial: link
       };
+    } catch (err) {
+      // Continuam cu textul din API-ul SOAP (dupa numar si an), cu avertisment
+      avertisment = `Forma consolidata la zi nu a putut fi preluata de pe legislatie.just.ro (${err.message || err}).`;
     }
-    const { arts, link } = fetched;
-    allArts = arts;
-    best = {
-      tip_act: resolved.tip_act || "ACT NORMATIV",
-      numar: resolved.numar,
-      data_vigoare: resolved.an,
-      titlu: `${resolved.tip_act || "Act"} nr. ${resolved.numar}/${resolved.an} (${resolved.titlu})`,
-      link_oficial: link
-    };
-  } else {
+  }
+  if (!best) {
     const filterItems = (items) => {
       if (resolved.tip_act && items.length) {
         const exp = stripDiacriticsLower(resolved.tip_act);
@@ -751,22 +765,40 @@ async function queryLegislatie({ act = "", articole = "", cuvinte_cheie = "" }, 
       );
     }
     if (!items.length) {
-      return { eroare: `Nu s-au gasit acte normative pentru '${act}' / '${cuvinte_cheie}'.`, disclaimer: DISCLAIMER_LEGAL };
+      return {
+        eroare: `Nu s-au gasit acte normative pentru '${act}' / '${cuvinte_cheie}'.`,
+        ...(avertisment ? { avertisment } : {}),
+        disclaimer: DISCLAIMER_LEGAL
+      };
     }
     best = [...items].sort((a, b) => (b.text || "").length - (a.text || "").length)[0];
-    if (best.link_oficial) {
+    // Pentru aliasuri pagina consolidata tocmai a esuat; nu o mai cerem inca o data
+    if (best.link_oficial && !resolved.doc_id) {
       try {
         const { arts, link } = await fetchConsolidatedArticles(best.link_oficial, cc);
         allArts = arts;
         if (arts.length) best = { ...best, link_oficial: link };
       } catch (err) {
-        avertisment = `Forma consolidata nu a putut fi preluata (${err}).`;
+        avertisment = `Forma consolidata nu a putut fi preluata (${err.message || err}).`;
       }
     }
     if (!allArts.length) {
-      avertisment = `${avertisment || "Pagina consolidata nu contine articole."} Textul provine din API-ul SOAP si poate sa nu fie la zi.`;
-      allArts = splitArticlesPlain(best.text);
+      allArts = splitArticlesPlain(best.text || "");
+      avertisment = avertisment || "Pagina consolidata nu contine articole.";
+      if (allArts.length) avertisment += " Textul provine din API-ul SOAP si poate sa nu fie la zi.";
     }
+  }
+
+  // Fara niciun articol nu exista text pe care modelul sa-l citeze: eroare explicita, nu un act "gol"
+  if (!allArts.length) {
+    return {
+      eroare:
+        "Textul actului nu a putut fi obtinut de pe legislatie.just.ro (nici forma consolidata, nici textul din API-ul SOAP). " +
+        "Spune utilizatorului ca sursa oficiala nu este disponibila acum; NU raspunde din memorie si NU cita articole.",
+      act: { tip_act: best.tip_act, numar: best.numar, data_vigoare: best.data_vigoare, titlu: best.titlu, link_oficial: best.link_oficial },
+      ...(avertisment ? { avertisment } : {}),
+      disclaimer: DISCLAIMER_LEGAL
+    };
   }
 
   const reqNums = parseRequestedArticles(articole);
@@ -910,7 +942,7 @@ export default {
           JSON.stringify({
             jsonrpc: "2.0",
             id,
-            result: { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: false }
+            result: { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: Boolean(res.eroare) }
           }),
           { headers: { ...corsHeaders(), "X-Legis-Cache": cc.stats.join(", ") } }
         );
