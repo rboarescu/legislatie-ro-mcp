@@ -7,6 +7,9 @@
   "main": "cloudflare-worker.js",
   "compatibility_date": "2025-09-01",
   "workers_dev": true,
+  // legislatie.just.ro refuza conexiunile HTTPS din afara Europei (Cloudflare raspunde atunci cu HTTP 520).
+  // Un client din SUA (ex. Gemini in cloud) ar rula Worker-ul in SUA; il fixam in Frankfurt.
+  "placement": { "region": "aws:eu-central-1" },
   // Necesar pentru build-urile de preview pe alte branch-uri (npx wrangler preview).
   "previews": {}
 }

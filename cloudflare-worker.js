@@ -414,7 +414,7 @@ async function soapPost(action, body) {
   const fault = extractTag(xml, "faultstring");
   if (!r.ok || fault) {
     const op = action.split("/").pop();
-    throw new Error(`SOAP ${op}: HTTP ${r.status}${fault ? `, fault: '${cleanText(fault).slice(0, 200)}'` : ` (${pageSnippet(xml)})`}`);
+    throw new Error(`SOAP ${op}: HTTP ${r.status}${httpStatusHint(r.status)}${fault ? `, fault: '${cleanText(fault).slice(0, 200)}'` : ` (${pageSnippet(xml)})`}`);
   }
   return xml;
 }
@@ -659,6 +659,13 @@ function fetchConsolidatedArticles(link, cc) {
 }
 
 // Inceputul paginii primite (titlu + text), ca sa se vada in raspuns ce a trimis portalul in locul actului
+// 520 = originea a inchis conexiunea; legislatie.just.ro face asta pentru HTTPS din afara Europei
+function httpStatusHint(status) {
+  return status === 520
+    ? " (legislatie.just.ro refuza conexiunile din afara Europei; fixati Worker-ul intr-o regiune UE: \"placement\" in wrangler.jsonc)"
+    : "";
+}
+
 function pageSnippet(html) {
   const title = cleanText((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "");
   const body = cleanText(html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")).replace(/\s+/g, " ");
@@ -671,7 +678,7 @@ async function fetchConsolidatedArticlesRaw(link) {
   const get = async (u) => {
     const r = await fetch(u.replace(/^http:\/\//i, "https://"), { headers: { "User-Agent": "legislatie-ro-mcp/1.0" } });
     const html = await r.text();
-    if (!r.ok) throw new Error(`HTTP ${r.status} pentru ${u} (${pageSnippet(html)})`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}${httpStatusHint(r.status)} pentru ${u} (${pageSnippet(html)})`);
     return html;
   };
   const rawHtml = await get(link);
