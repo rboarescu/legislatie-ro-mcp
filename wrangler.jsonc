@@ -6,5 +6,7 @@
   "name": "legislatie-ro-mcp",
   "main": "cloudflare-worker.js",
   "compatibility_date": "2025-09-01",
-  "workers_dev": true
+  "workers_dev": true,
+  // Necesar pentru build-urile de preview pe alte branch-uri (npx wrangler preview).
+  "previews": {}
 }
