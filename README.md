@@ -77,7 +77,7 @@ Adăugați în fișierul de configurare MCP (`claude_desktop_config.json` sau `m
 
 Fiecare utilizator își rulează propria instanță pe contul său Cloudflare (Free Tier) și răspunde de ea. Worker-ul este **privat implicit**: `/mcp` și `/cauta` cer un token.
 
-1. Creați un Worker din `cloudflare-worker.js` (dashboard sau `npx wrangler deploy cloudflare-worker.js --name legislatie-ro`).
+1. Publicați Worker-ul din acest director cu `npx wrangler deploy` sau conectând repository-ul în Workers Builds. Ambele citesc `wrangler.jsonc`, care fixează Worker-ul în Frankfurt (`"placement": { "region": "aws:eu-central-1" }`). Fără această setare, un client din SUA (ex. Gemini în cloud) rulează Worker-ul în SUA, iar `legislatie.just.ro` refuză conexiunile HTTPS din afara Europei: rezultatul este `HTTP 520`. Dacă lipiți codul direct în dashboard, setați aceeași regiune în setările de *Placement* ale Worker-ului.
 2. Setați secretul **`ACCESS_TOKEN`** (Settings → Variables and Secrets → *Secret*). Pot fi mai multe tokenuri separate prin virgulă, câte unul pentru fiecare persoană, ca să poată fi revocate individual. Generați unul cu `openssl rand -hex 24`.
 3. Trimiteți tokenul prin:
    - `Authorization: Bearer <token>` (ChatGPT Actions → Authentication → API Key → Bearer),

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-29
+
+### Cloudflare Worker: `HTTP 520` de la API-ul SOAP
+- Dintr-o sesiune Gemini în cloud, apelurile către `legislatie.just.ro` eșuau cu `HTTP 520`. Cererea venea din SUA, deci Worker-ul rula tot acolo, iar `legislatie.just.ro` refuză conexiunile HTTPS din afara Europei. Sondat din regiunile Cloudflare: Atlanta → 520 pe HTTPS (HTTP merge, dar paginile consolidate redirecționează spre HTTPS); Frankfurt, Bruxelles, București → 200.
+- `wrangler.jsonc` fixează Worker-ul în `aws:eu-central-1` (Frankfurt) prin `placement.region`.
+- Eroarea pentru `520` (SOAP și pagina consolidată) explică acum cauza și remedierea.
+
 ## 2026-10-23
 
 ### Eșecuri vizibile la preluarea textului (Worker + `server.py`)
